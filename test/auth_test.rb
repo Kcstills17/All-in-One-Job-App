@@ -1,7 +1,5 @@
 # Account flows end to end, against the test database. Run: bundle exec rake
-ENV["RACK_ENV"] = "test"
-require_relative "../app"
-require "minitest/autorun"
+require_relative "helper"
 require "rack/test"
 
 class AuthTest < Minitest::Test
@@ -13,8 +11,7 @@ class AuthTest < Minitest::Test
 
   def setup
     Mail::TestMailer.deliveries.clear
-    %i[account_password_hashes account_verification_keys account_password_reset_keys
-       account_login_failures account_lockouts accounts].each { DB[_1].delete }
+    reset_db!
   end
 
   # GET the page holding the form, then POST to it with that form's CSRF token.
