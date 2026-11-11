@@ -7,7 +7,16 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const stageOf = j => j.history[j.history.length - 1].stage;
 const byId = id => jobs.find(j => j.id === id);
-const api = (path, opts = {}) => fetch(path, { headers: { "content-type": "application/json" }, ...opts }).then(r => r.json());
+// Writes carry the CSRF token from /api/session; an expired login goes back to the login page.
+let csrfToken;
+const csrf = () => csrfToken ??= fetch("/api/session").then(r => r.json()).then(s => s.csrf);
+const api = async (path, opts = {}) => {
+  const headers = { "content-type": "application/json" };
+  if (opts.method && opts.method !== "GET") headers["x-csrf-token"] = await csrf();
+  const res = await fetch(path, { ...opts, headers });
+  if (res.status === 401) { location.href = "/login"; return new Promise(() => {}); }
+  return res.json();
+};
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v);
 // Progress stages walk from indigo → teal → green; endings get their own warning colors.
 const PALETTE = {
@@ -919,7 +928,7 @@ function openDetail(id) {
       <label>Role<input name="title" value="${esc(j.title)}"></label>
       <label>Location<input name="location" list="cityList" value="${esc(j.location)}"></label>
       <label>Salary <span class="payPreview">${payPreview(j.pay)}</span>
-        <input name="pay" value="${esc(j.pay)}" placeholder="120k · 100–140k · $45/hr" oninput="this.previousElementSibling.innerHTML = payPreview(this.value)"></label>
+        <input name="pay" value="${esc(j.pay)}" placeholder="120k · 100–140k · $45/hr"></label>
       <label>Applied on<input type="date" name="applied_on" value="${esc(j.applied_on)}"></label>
       <label>Posting link<input name="url" value="${esc(j.url)}"></label>
       <label style="grid-column:1/-1">Notes<textarea name="notes">${esc(j.notes)}</textarea></label>
@@ -967,3 +976,9 @@ const scope = new URLSearchParams(location.search).get("scope"); // e.g. /?scope
 if (scope) $("#scope").value = scope;
 showView();
 load();
+
+// Live salary preview in the detail panel (an event listener, since the page allows no inline handlers).
+document.addEventListener("input", e => {
+  const preview = e.target.previousElementSibling;
+  if (e.target.name === "pay" && preview?.classList.contains("payPreview")) preview.innerHTML = payPreview(e.target.value);
+});
