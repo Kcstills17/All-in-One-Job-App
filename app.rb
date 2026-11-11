@@ -1,4 +1,5 @@
 require_relative "config"
+require_relative "api"
 require "roda"
 require "mail"
 
@@ -66,7 +67,23 @@ class App < Roda
     logout_redirect "/login"
   end
 
+  include Api
+  plugin :all_verbs # r.patch, r.delete
+  plugin :json
+  plugin :json_parser, error_handler: ->(r) { r.halt([400, { "content-type" => "application/json" }, ['{"error":"Bad JSON"}']]) }
+
   route do |r|
+    r.on "api" do
+      account = rodauth.logged_in? && rodauth.account_from_session or
+        r.halt([401, { "content-type" => "application/json" }, ['{"error":"Log in first"}']])
+      # The page sends one token in a header (from GET /api/session); forms keep per-form tokens.
+      check_csrf!(check_header: true, require_request_specific_tokens: false)
+      api_routes(r, account[:id])
+    rescue Api::Invalid => e
+      response.status = 422
+      { error: e.message }
+    end
+
     check_csrf!
     r.rodauth
     rodauth.require_account # everything below needs a logged-in, verified account
