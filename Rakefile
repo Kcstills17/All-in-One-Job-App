@@ -42,7 +42,11 @@ task :migrate do
   Sequel.extension :migration
   Sequel::Migrator.run(DB, "migrate")
   Sequel.connect(ENV.fetch("PASSWORD_DATABASE_URL")) do |db|
-    Sequel::Migrator.run(db, "migrate_password", table: :schema_info_password)
+    # The migrator always tries to create its version table, and the password user may only create
+    # tables during setup. So skip it unless a migrate_password/ file hasn't run yet.
+    current = db.table_exists?(:schema_info_password) &&
+              db[:schema_info_password].get(:version) >= Dir["migrate_password/*.rb"].size
+    Sequel::Migrator.run(db, "migrate_password", table: :schema_info_password) unless current
   end
 end
 
