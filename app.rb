@@ -4,7 +4,8 @@ require "mail"
 
 # Dev: print emails (verification and reset links) to the terminal. Test: keep them in memory.
 class ConsoleMail
-  def initialize(_opts) = nil
+  attr_reader :settings # Mail reads this after delivering
+  def initialize(settings) = @settings = settings
   def deliver!(mail) = puts("\n--- Email to #{mail.to.join(', ')}: #{mail.subject}\n#{mail.body.decoded}\n---\n")
 end
 
