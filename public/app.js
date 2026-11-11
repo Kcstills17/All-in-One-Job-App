@@ -976,6 +976,7 @@ const scope = new URLSearchParams(location.search).get("scope"); // e.g. /?scope
 if (scope) $("#scope").value = scope;
 showView();
 load();
+addEventListener("themechange", () => { if (jobs.length) render(); }); // charts read colors when they draw
 
 // Live salary preview in the detail panel (an event listener, since the page allows no inline handlers).
 document.addEventListener("input", e => {

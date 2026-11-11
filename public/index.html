@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Job Tracker</title>
 <link rel="stylesheet" href="/app.css">
+<script src="/theme.js"></script>
 <script src="/vendor/d3.min.js"></script>
 <script src="/vendor/d3-sankey.min.js"></script>
 </head>
@@ -30,6 +31,12 @@
     <button type="button" data-view="together"><svg class="ic" aria-hidden="true"><use href="#i-together"/></svg><span class="label">Together</span><span class="count"></span></button>
   </nav>
   <div class="side-foot">
+    <div class="theme-row">
+      <span class="label" aria-hidden="true">Dark mode</span>
+      <button type="button" id="themeToggle" class="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
+        <span class="knob" aria-hidden="true"><span class="px-grid"></span></span>
+      </button>
+    </div>
     <a class="navlink" href="/account"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg><span class="label">Account</span></a>
   </div>
 </aside>
