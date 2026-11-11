@@ -42,7 +42,7 @@ function path(j) {
   return steps;
 }
 
-$("#bm").href = `javascript:(()=>{window.open('${location.origin}/add?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'_blank','width=420,height=160')})()`;
+$("#bm").href = `javascript:(()=>{window.open('${location.origin}/add?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'_blank','width=460,height=600')})()`;
 
 async function load() {
   let refData;

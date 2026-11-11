@@ -68,6 +68,7 @@ class App < Roda
     # Closing an account deletes the account row; applications, timeline steps and referrals cascade.
     delete_account_on_close? true
     login_redirect "/"
+    login_return_to_requested_location? true # e.g. back to the bookmarklet popup after logging in
     logout_redirect "/login"
   end
 
@@ -95,5 +96,39 @@ class App < Roda
 
     r.root { File.read(File.join(__dir__, "public/index.html")) }
     r.get("account") { view "home" }
+
+    # Bookmarklet popup: opening it only shows a pre-filled form; Save is a POST with a CSRF token,
+    # so another site can open this page but can't log anything into the account.
+    r.is "add" do
+      account_id = rodauth.session_value
+      apps = Application.where(account_id: account_id)
+      r.get do
+        url = r.params["url"].to_s.strip
+        @job = { "url" => url }
+        begin
+          link!(url)
+          if !url.empty? && (dup = apps.with_encrypted_value(:url, url).first)
+            @duplicate = dup.to_api
+          else
+            info = url.empty? ? {} : Fetcher.fetch(url)
+            tab_title = r.params["title"].to_s.sub(/\s*[|\-–].*\z/, "") # "Role at Acme | Greenhouse" -> "Role at Acme"
+            @job.merge!("company" => info[:company].to_s, "title" => auto_title(info, tab_title).to_s,
+                        "location" => Locations.normalize(info[:location]), "pay" => info[:pay].to_s)
+          end
+        rescue Api::Invalid => e
+          @error = e.message
+        end
+        view "add"
+      end
+      r.post do
+        job = add_job(apps, account_id, r.params)
+        job[:duplicate] ? (@duplicate = job) : (@saved = job)
+        view "add"
+      rescue Api::Invalid => e
+        @error = e.message
+        @job = r.params
+        view "add"
+      end
+    end
   end
 end
