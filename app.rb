@@ -1,5 +1,6 @@
 require_relative "config"
 require_relative "api"
+require_relative "throttle"
 require "roda"
 require "mail"
 
@@ -21,6 +22,7 @@ Mail.defaults do
 end
 
 class App < Roda
+  use Throttle
   PRODUCTION = ENV["RACK_ENV"] == "production"
 
   plugin :default_headers, {
@@ -67,6 +69,7 @@ class App < Roda
     max_invalid_logins 10              # then the account locks until the emailed unlock link is used
     # Closing an account deletes the account row; applications, timeline steps and referrals cascade.
     delete_account_on_close? true
+
     login_redirect "/"
     login_return_to_requested_location? true # e.g. back to the bookmarklet popup after logging in
     logout_redirect "/login"
