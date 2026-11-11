@@ -15,4 +15,5 @@ group :development, :test do
   gem "dotenv"
   gem "minitest"
   gem "rack-test"
+  gem "bundler-audit" # rake audit: checks gems against known security advisories
 end

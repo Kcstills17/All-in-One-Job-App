@@ -60,3 +60,8 @@ end
 
 Rake::TestTask.new { |t| t.pattern = "test/*_test.rb"; t.warning = false }
 task default: :test
+
+desc "Check gems against the Ruby security advisory database"
+task :audit do
+  sh "bundle exec bundle-audit check --update"
+end
