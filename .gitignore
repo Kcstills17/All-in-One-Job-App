@@ -54,3 +54,12 @@ build-iPhoneSimulator/
 
 # Used by RuboCop. Remote config files pulled in from inherit_from directive.
 # .rubocop-https?--*
+
+## Job tracker: never commit secrets or personal job data
+.env
+.env.*
+!.env.example
+jobs*.json
+referrals*.json
+/data/
+/log/
