@@ -2,6 +2,8 @@ require "json"
 require "net/http"
 require "cgi"
 require "openssl"
+require "ipaddr"
+require "socket"
 
 # Pulls company/title/location/pay from a job URL using the public job-board APIs.
 # Anything it can't recognize falls back to the page's <title>.
@@ -101,15 +103,49 @@ module Fetcher
   # Fresh cert store: this Ruby's default one demands CRLs and fails every HTTPS call. Verification stays on.
   STORE = OpenSSL::X509::Store.new.tap(&:set_default_paths)
 
+  class Blocked < StandardError; end
+
+  MAX_BYTES = 2_000_000
+  # Addresses a user's link must never make the server fetch: its own machine, private networks
+  # (including the hosting provider's internal one), cloud metadata services and reserved ranges.
+  BLOCKED = %w[0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24
+               192.0.2.0/24 192.168.0.0/16 198.18.0.0/15 198.51.100.0/24 203.0.113.0/24 224.0.0.0/3
+               ::/128 ::1/128 64:ff9b::/96 100::/64 2001:db8::/32 fc00::/7 fe80::/10 ff00::/8].map { IPAddr.new(_1) }
+
+  # Every request goes through here, redirects included, so each hop is checked.
   def get(url, limit = 3)
     uri = URI(url)
+    ip = safe_address!(uri)
     http = Net::HTTP.new(uri.host, uri.port)
+    http.ipaddr = ip # connect to the address that was checked, so DNS can't swap in another
     http.use_ssl = uri.scheme == "https"
     http.cert_store = STORE
-    http.open_timeout = http.read_timeout = 15
+    http.open_timeout = 5
+    http.read_timeout = 10
     # Work at a Startup answers 406 unless HTML is explicitly accepted.
-    res = http.request(Net::HTTP::Get.new(uri, "User-Agent" => UA, "Accept" => "text/html,application/json;q=0.9,*/*;q=0.8"))
-    res.is_a?(Net::HTTPRedirection) && limit > 0 ? get(URI.join(url, res["location"]).to_s, limit - 1) : res.body.to_s.dup.force_encoding("UTF-8").scrub
+    req = Net::HTTP::Get.new(uri, "User-Agent" => UA, "Accept" => "text/html,application/json;q=0.9,*/*;q=0.8")
+    body = +""
+    res = http.request(req) do |r|
+      r.read_body { |chunk| body << chunk; raise Blocked, "response too large" if body.bytesize > MAX_BYTES } unless r.is_a?(Net::HTTPRedirection)
+    end
+    return get(URI.join(url, res["location"]).to_s, limit - 1) if res.is_a?(Net::HTTPRedirection) && limit > 0
+    body.force_encoding("UTF-8").scrub
+  end
+
+  # Returns the IP to connect to, or raises Blocked for anything but a public http(s) address on 80/443.
+  def safe_address!(uri)
+    raise Blocked, "only http and https links" unless %w[http https].include?(uri.scheme) && uri.host
+    raise Blocked, "only standard web ports" unless [80, 443].include?(uri.port)
+    addrs = Addrinfo.getaddrinfo(uri.host.delete_prefix("[").delete_suffix("]"), nil, nil, :STREAM).map(&:ip_address).uniq
+    raise Blocked, "unknown host" if addrs.empty?
+    addrs.each do |a|
+      ip = IPAddr.new(a)
+      ip = ip.native # ::ffff:127.0.0.1 is 127.0.0.1
+      raise Blocked, "private or reserved address" if BLOCKED.any? { _1.family == ip.family && _1.include?(ip) }
+    end
+    addrs.first
+  rescue SocketError, IPAddr::InvalidAddressError
+    raise Blocked, "unknown host"
   end
 
   def get_json(url) = JSON.parse(get(url))
