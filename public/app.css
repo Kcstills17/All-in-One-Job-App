@@ -224,3 +224,26 @@
   .theme-toggle[aria-checked="true"] .px-grid i { background:#e4e9ff; }
   .theme-toggle:not(.ready), .theme-toggle:not(.ready) * { transition:none !important; }
   @media (prefers-reduced-motion: reduce) { .theme-toggle, .theme-toggle * { transition:none !important; } }
+  /* Phones: the sidebar becomes a sticky top bar; wide tables scroll inside their card, never the page. */
+  @media (max-width:760px) {
+    .shell { flex-direction:column; }
+    .side { position:sticky; top:0; z-index:5; flex:none; height:auto; flex-direction:row; align-items:center; gap:6px;
+      padding:8px 16px; border-right:0; border-bottom:1px solid var(--line); overflow-x:auto; }
+    .brand { margin:0 4px 0 0; } .brand .label { display:none; }
+    #tabs { flex-direction:row; gap:2px; }
+    #tabs button { width:auto; white-space:nowrap; padding:0 10px; }
+    #tabs .count { display:none; }
+    .side-foot { margin:0 0 0 auto; flex-direction:row; align-items:center; gap:4px; }
+    .theme-row { padding:0; } .theme-row .label, .navlink .label { display:none; }
+    .navlink { width:auto; }
+    .shell > main { padding:16px 16px 48px; }
+    .card { padding:14px; }
+    .card > table, details > table { display:block; overflow-x:auto; }
+  }
+  @media (max-width:520px) {
+    .goals { grid-template-columns:1fr; }
+    .brand { display:none; }
+    /* Only the open tab shows its name; the others keep it for screen readers. */
+    #tabs button:not([aria-pressed="true"]) .label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  }
+  .msg:empty { min-height:0; margin:0; }
