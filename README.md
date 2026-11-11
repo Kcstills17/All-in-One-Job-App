@@ -17,7 +17,7 @@ bundle exec puma -b tcp://127.0.0.1:4570 config.ru
 
 Open http://localhost:4570 and create an account. In development, emails such as the verification link print to the terminal running the server.
 
-Run the tests with `bundle exec rake`.
+Run the tests with `bundle exec rake`, and check the gems for known security problems with `bundle exec rake audit`.
 
 ### Importing data from the old local app
 
