@@ -97,7 +97,7 @@ Browser ──HTTPS──▶ Puma ──▶ Roda app (app.rb)
 | Step | Status |
 |---|---|
 | 1. Roda + Sequel + Rodauth app with accounts, and tests | **Done** |
-| 2. Applications and referrals tables, plus importing Zane's data | Next |
+| 2. Applications and referrals tables, plus importing Zane's data | **Done** (`rake import`) |
 | 3. Move the page and API over, plus the bookmarklet key | |
 | 4. Security pass: auto-fill safety, a test proving users can't see each other's data, a security scan | |
 | 5. Host on Fly.io | |

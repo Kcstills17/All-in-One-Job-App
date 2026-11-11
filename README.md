@@ -19,6 +19,16 @@ Open http://localhost:4570 and create an account. In development, emails such as
 
 Run the tests with `bundle exec rake`.
 
+### Importing data from the old local app
+
+New accounts start empty. To copy the old app's `jobs.json` and `referrals.json` into one account, sign up and verify first, then run:
+
+```sh
+bundle exec rake import EMAIL=you@example.com FROM=~/Desktop/Zanes/job-tracker
+```
+
+The import only reads the old files. Running it again syncs the account: edited entries update and new ones get added. Anything deleted in the old app has to be deleted here too. If any count doesn't match, nothing is saved.
+
 ## Security
 
 - **Passwords:** hashed with bcrypt and stored in a table owned by a separate database user. The app can check a password but can't read the hashes, so a SQL injection bug can't leak them.
