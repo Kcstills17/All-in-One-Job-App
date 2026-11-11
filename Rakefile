@@ -50,5 +50,12 @@ task :migrate do
   end
 end
 
+desc "Import the old app's data into one account: rake import EMAIL=you@example.com [FROM=dir]"
+task :import do
+  require_relative "import"
+  dir = File.expand_path(ENV.fetch("FROM", "~/Desktop/Zanes/job-tracker"))
+  puts "Imported into #{ENV.fetch('EMAIL')}: #{Import.run(ENV.fetch('EMAIL'), dir)}"
+end
+
 Rake::TestTask.new { |t| t.pattern = "test/*_test.rb"; t.warning = false }
 task default: :test
