@@ -60,6 +60,8 @@ class App < Roda
     password_minimum_length 10
     password_maximum_bytes 72          # bcrypt ignores anything past 72 bytes
     max_invalid_logins 10              # then the account locks until the emailed unlock link is used
+    # Closing an account deletes the account row; applications, timeline steps and referrals cascade.
+    delete_account_on_close? true
     login_redirect "/"
     logout_redirect "/login"
   end
