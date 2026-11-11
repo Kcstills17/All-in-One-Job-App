@@ -1,0 +1,11 @@
+<h1>Job Tracker</h1>
+<p>Logged in as <b><%= rodauth.account[:email] %></b>.</p>
+<p class="muted">Your applications and referrals move here in the next step.</p>
+<div class="nav">
+  <a href="<%= rodauth.change_password_path %>">Change password</a>
+  <a href="<%= rodauth.close_account_path %>">Delete account</a>
+</div>
+<form method="post" action="<%= rodauth.logout_path %>" style="margin-top:16px">
+  <%== rodauth.csrf_tag(rodauth.logout_path) %>
+  <button type="submit">Log out</button>
+</form>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Tracker</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1b1f24; --muted:#5b6470; --line:#d9dde3; --accent:#2f6fde; --err:#b42318; --ok:#1a7f37; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --card:#1a1e24; --ink:#e8eaed; --muted:#a0a8b3; --line:#2e343d; --accent:#5a8cee; --err:#ff8a80; --ok:#6fdc8c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
+  main { max-width:420px; margin:48px auto; padding:0 16px; }
+  h1 { font-size:22px; margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px; }
+  .form-group { margin-bottom:14px; }
+  label { display:block; font-weight:600; margin-bottom:4px; }
+  input[type=email], input[type=password], input[type=text] { width:100%; padding:10px 12px; font:inherit; color:inherit;
+    background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+  input:focus-visible, button:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn, button, input[type=submit] { font:inherit; padding:10px 16px; border:0; border-radius:8px; background:var(--accent);
+    color:#fff; cursor:pointer; }
+  a { color:var(--accent); }
+  .flash { padding:10px 12px; border-radius:8px; margin-bottom:16px; border:1px solid currentColor; }
+  .flash.error, .error_message, .invalid-feedback { color:var(--err); }
+  .flash.notice { color:var(--ok); }
+  .nav { display:flex; gap:16px; flex-wrap:wrap; margin-top:16px; }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <% if flash["notice"] %><p class="flash notice" role="status"><%= flash["notice"] %></p><% end %>
+  <% if flash["error"] %><p class="flash error" role="alert"><%= flash["error"] %></p><% end %>
+  <div class="card"><%== yield %></div>
+  <% unless rodauth.logged_in? %>
+    <p class="nav"><a href="<%= rodauth.login_path %>">Log in</a><a href="<%= rodauth.create_account_path %>">Create account</a></p>
+  <% end %>
+</main>
+</body>
+</html>
