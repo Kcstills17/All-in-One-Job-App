@@ -1,0 +1,25 @@
+<% if @saved %>
+  <h1>Logged</h1>
+  <p><b><%= @saved[:company] %></b> — <%= @saved[:title] %></p>
+  <p class="muted" data-close-after="1500">This window closes by itself.</p>
+<% elsif @duplicate %>
+  <h1>Already logged</h1>
+  <p>You logged <b><%= @duplicate[:company] %></b> — <%= @duplicate[:title] %> on <%= @duplicate[:applied_on] %>.</p>
+  <p><a href="/" target="_blank" rel="noopener">Open your applications</a></p>
+<% else %>
+  <h1>Log this job</h1>
+  <% if @error %><p class="flash error" role="alert"><%= @error %></p><% end %>
+  <form method="post" action="/add">
+    <%== csrf_tag("/add") %>
+    <input type="hidden" name="url" value="<%= @job["url"] %>">
+    <p class="muted" style="word-break:break-all;margin-top:0"><%= @job["url"] %></p>
+    <div class="form-group"><label for="company">Company</label><input type="text" id="company" name="company" value="<%= @job["company"] %>"></div>
+    <div class="form-group"><label for="title">Role</label><input type="text" id="title" name="title" value="<%= @job["title"] %>"></div>
+    <div class="form-group"><label for="location">Location</label>
+      <input type="text" id="location" name="location" list="locations" value="<%= @job["location"] %>" placeholder="Leave blank if unsure">
+      <datalist id="locations"><% Locations::ALL.each do |loc| %><option value="<%= loc %>"></option><% end %></datalist></div>
+    <div class="form-group"><label for="pay">Salary</label><input type="text" id="pay" name="pay" value="<%= @job["pay"] %>" placeholder="120k or 100–140k"></div>
+    <button type="submit">Save</button>
+  </form>
+<% end %>
+<script src="/popup.js"></script>
