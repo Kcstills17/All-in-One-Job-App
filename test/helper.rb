@@ -8,6 +8,6 @@ require "minitest/autorun"
 # applications, timeline steps and referrals cascade from accounts.
 def reset_db!
   %i[account_password_hashes account_verification_keys account_password_reset_keys
-     account_login_failures account_lockouts accounts].each { DB[_1].delete }
+     account_login_failures account_lockouts accounts daily_email_counts].each { DB[_1].delete }
   Throttle.reset! # every test signs in from the same address
 end
