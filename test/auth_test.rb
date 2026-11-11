@@ -47,7 +47,7 @@ class AuthTest < Minitest::Test
     get URI(emailed_link).request_uri
     follow_redirect! while last_response.redirect?
     submit "/verify-account", {}
-    get "/"
+    get "/account"
     assert_includes last_response.body, "Logged in as <b>#{EMAIL}</b>"
 
     submit "/logout", {}
@@ -83,7 +83,7 @@ class AuthTest < Minitest::Test
     submit "/reset-password", "password" => "a brand new password", "password-confirm" => "a brand new password"
     submit "/logout", {}
     log_in("a brand new password")
-    get "/"
+    get "/account"
     assert_includes last_response.body, "Logged in as"
   end
 

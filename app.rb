@@ -31,6 +31,8 @@ class App < Roda
   }.compact
   plugin :content_security_policy do |csp|
     csp.default_src :none
+    csp.script_src :self            # app.js and the copied d3 files; nothing inline, no CDNs
+    csp.connect_src :self           # the page's own /api calls
     csp.style_src :self, :unsafe_inline
     csp.img_src :self
     csp.form_action :self
@@ -43,6 +45,7 @@ class App < Roda
   plugin :flash
   plugin :route_csrf, csrf_failure: :empty_403 # a form without a valid token gets a plain 403
   plugin :render, escape: true, layout: "layout"
+  plugin :public # public/: the page's html, css, js and d3 (no user data in them)
 
   plugin :rodauth do
     db DB
@@ -84,10 +87,12 @@ class App < Roda
       { error: e.message }
     end
 
+    r.public
     check_csrf!
     r.rodauth
     rodauth.require_account # everything below needs a logged-in, verified account
 
-    r.root { view "home" }
+    r.root { File.read(File.join(__dir__, "public/index.html")) }
+    r.get("account") { view "home" }
   end
 end

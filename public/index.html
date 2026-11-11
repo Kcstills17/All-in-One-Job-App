@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Tracker</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/vendor/d3.min.js"></script>
+<script src="/vendor/d3-sankey.min.js"></script>
+</head>
+<body>
+<main>
+  <h1>Job Tracker <a href="/account" style="float:right;font-size:14px;font-weight:500">Account</a></h1>
+  <nav id="tabs" aria-label="Sections">
+    <button type="button" data-view="applications" id="tabApps">Applications</button>
+    <button type="button" data-view="referrals" id="tabRefs">Referrals</button>
+    <button type="button" data-view="together">Together</button>
+  </nav>
+  <p id="loadErr" role="alert" hidden style="color:var(--bad);margin:0 0 12px"><b>Couldn't load your referrals, but your data isn't lost.</b> Refresh the page. If it keeps happening, log out and back in.</p>
+
+  <div class="view" id="view-applications">
+  <p class="sub">Paste a job link (Greenhouse, Ashby, Lever, LinkedIn, Y Combinator and Work at a Startup fill in the details automatically; Workday fills in what's in the link), and the details fill in.</p>
+
+  <section class="card">
+    <form id="add" class="row">
+      <input type="url" name="url" placeholder="https://jobs.ashbyhq.com/…">
+      <input name="company" placeholder="Company (optional)">
+      <input name="title" placeholder="Title (optional)">
+      <input name="pay" placeholder="Salary: 120k or 100–140k" style="width:190px">
+      <input name="location" list="cityList" placeholder="Location (optional)" style="width:160px" title="Pick a suggestion or type any location. Leave blank to use the posting's location.">
+      <button>Log application</button>
+      <button type="button" class="ghost" id="openlog">Open posting &amp; log</button>
+    </form>
+    <div class="msg" id="msg"></div>
+    <!-- Hidden until the bookmarklet's confirm popup exists (security step). -->
+    <p class="sub" style="margin:10px 0 0" hidden>Drag this to your bookmarks bar, then click it on any job page after you apply:
+      <a class="bm" id="bm" href="#">＋ Log job</a></p>
+  </section>
+
+  <section class="card">
+    <div class="row spread" style="margin-bottom:12px">
+      <h2>Activity</h2>
+      <div class="row">
+        <label class="switch"><input type="checkbox" id="goalsOn" role="switch"><span></span> Goals</label>
+        <button class="ghost" id="editGoals" type="button">Edit goals</button>
+      </div>
+    </div>
+    <form id="goalForm" class="row" hidden style="margin-bottom:12px">
+      <label>Per weekday<input type="number" min="0" name="day" style="width:90px"></label>
+      <label>Per week<input type="number" min="0" name="week" style="width:90px"></label>
+      <label>Per month<input type="number" min="0" name="month" style="width:90px"></label>
+      <button style="align-self:end">Save</button>
+      <button type="button" class="ghost" id="cancelGoals" style="align-self:end">Cancel</button>
+    </form>
+    <div class="goals" id="goals"></div>
+  </section>
+
+  <section class="card">
+    <div class="row spread" style="margin-bottom:12px">
+      <h2>Overview</h2>
+      <select id="city" aria-label="Filter by location"><option value="">All locations</option></select>
+    </div>
+    <div class="stats" id="stats"></div>
+    <details style="margin-top:14px">
+      <summary class="link" style="font-size:13px">By location</summary>
+      <table class="cities">
+        <thead><tr><th>Location</th><th>Applied</th><th>Response rate</th><th>Recruiter screens</th><th>Interviews</th><th>Furthest stage</th></tr></thead>
+        <tbody id="cities"></tbody>
+      </table>
+    </details>
+    <datalist id="cityList"></datalist>
+  </section>
+
+  <section class="card">
+    <div class="row spread" style="margin-bottom:8px">
+      <h2 id="pipeTitle">Pipeline</h2>
+      <div class="row">
+        <select id="scope">
+          <option value="all">All applications</option>
+          <option value="responded">Got a response</option>
+          <option value="interviewed">Reached an interview</option>
+        </select>
+        <select id="range"><option value="0">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>
+        <label class="row" style="font-size:13px;color:var(--muted)" title="Scales band widths by √count so small stages stay readable. Numbers are always exact.">
+          <input type="checkbox" id="compress" checked> Compress big flows</label>
+      </div>
+    </div>
+    <div id="chart"></div>
+    <div id="tip" hidden></div>
+    <p class="sub" style="margin:6px 0 0;font-size:12px">Click a stage or a flow to see the companies in it.</p>
+    <div id="drill"></div>
+  </section>
+
+  <section class="card">
+    <div class="row spread" style="margin-bottom:12px">
+      <h2 id="salTitle">Salary</h2>
+      <label class="row" style="font-size:13px;color:var(--muted)">Group by
+        <select id="salGroup">
+          <option value="family">Role type</option><option value="level">Level</option><option value="city">Location</option>
+          <option value="band">Salary band</option><option value="stage">Furthest stage</option><option value="title">Exact title</option>
+        </select></label>
+    </div>
+    <div class="stats" id="salStats"></div>
+    <div class="hist" id="salHist"></div>
+    <div class="table-wrap" style="max-height:none;margin-top:6px">
+      <table class="saltable">
+        <thead><tr><th id="salHead">Role type</th><th>Roles</th><th>Average</th><th>Median</th><th class="hide-sm">Range <span class="legend">▬ lowest–highest · ■ middle 50% · | median</span></th><th>Response rate</th><th>Screen rate</th><th>Interview rate</th></tr></thead>
+        <tbody id="salRows"></tbody>
+      </table>
+    </div>
+    <p class="sub" style="margin:8px 0 0;font-size:12px">Uses each role's salary midpoint. Hourly pay is converted at 2,080 hrs/yr. Click a bar or row to list those roles below.</p>
+  </section>
+
+  <section class="card">
+    <div class="row" style="margin-bottom:8px">
+      <input id="q" type="search" autocomplete="off" style="flex:1 1 340px"
+        placeholder='Search…  try: stripe · stage:rejected · city:remote · after:2026-03 · "support engineer"   ( / )'>
+      <select id="stageFilter" aria-label="Current stage"><option value="">All stages</option></select>
+      <select id="month" aria-label="Month applied"><option value="">Any month</option></select>
+      <label class="row" style="font-size:13px;color:var(--muted)"><input type="checkbox" id="ivOnly"> Interviewed only</label>
+    </div>
+    <details class="tips">
+      <summary class="link">Search tips</summary>
+      <div class="sub" style="margin:6px 0 0">
+        Words must all match (company, role, location, notes, timeline notes). Use <code>"quotes"</code> for exact phrases and <code>-word</code> to exclude.<br>
+        <code>company:</code> <code>role:</code> <code>stage:</code> (current stage) <code>reached:</code> (any stage it hit) <code>city:</code>
+        <code>after:2026-03</code> <code>before:2026-06-15</code> <code>has:notes</code> <code>has:link</code> <code>has:pay</code>.
+        Press <kbd>/</kbd> to search, <kbd>Enter</kbd> to open a single match, <kbd>Esc</kbd> to clear.
+      </div>
+    </details>
+    <div class="row spread" style="margin:10px 0 6px">
+      <span id="resultInfo" class="sub" style="margin:0"></span>
+      <span id="pager" class="row"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="sortRow"><th data-sort="applied_on">Applied</th><th data-sort="company">Company</th><th data-sort="title">Role</th><th class="hide-sm" data-sort="city">Location</th><th class="hide-sm" data-sort="pay">Salary</th><th data-sort="stage">Stage</th><th class="hide-sm">Notes</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+
+  <div class="view" id="view-together" hidden>
+    <section class="card">
+      <h2 style="margin-bottom:12px">Applications and referrals</h2>
+      <div class="stats" id="togStats"></div>
+      <table class="compare" style="margin-top:14px">
+        <thead><tr><th>Measure</th><th><i class="swatch" style="background:var(--apps)"></i>Applications</th><th><i class="swatch" style="background:var(--refs)"></i>Referrals</th></tr></thead>
+        <tbody id="togCompare"></tbody>
+      </table>
+      <p class="sub" style="margin:8px 0 0;font-size:12px">Application responses count every application. Referral replies count only people you've contacted. Location and salary aren't shown because referrals don't have them.</p>
+    </section>
+    <section class="card">
+      <h2 style="margin-bottom:12px">Activity by month</h2>
+      <div id="togMonths"></div>
+      <p class="sub" style="margin:0;font-size:12px">Each row has its own scale, so compare the shape over time, not the bar heights. <span id="togUndated"></span></p>
+    </section>
+    <section class="card">
+      <div class="row spread" style="margin-bottom:12px">
+        <h2>Roles</h2>
+        <label class="row" style="font-size:13px;color:var(--muted)">Group by
+          <select id="togGroup"><option value="family">Role type</option><option value="level">Level</option></select></label>
+      </div>
+      <table class="compare">
+        <thead><tr><th id="togGroupHead">Role type</th><th><i class="swatch" style="background:var(--apps)"></i>Applications</th><th>Response rate</th><th><i class="swatch" style="background:var(--refs)"></i>Referrals</th><th>Reply rate</th></tr></thead>
+        <tbody id="togGroups"></tbody>
+      </table>
+    </section>
+    <section class="card">
+      <h2 style="margin-bottom:12px">Companies in both <span class="sub" id="bothCount"></span></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Company</th><th>Applications</th><th>Furthest stage</th><th>Referrers</th></tr></thead>
+          <tbody id="bothRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="view" id="view-referrals" hidden>
+  <section class="card">
+    <h2 style="margin-bottom:12px">Referral overview</h2>
+    <div class="stats" id="refStats"></div>
+    <div class="chartgrid">
+      <div><h3>Progress</h3><div id="refFunnel"></div></div>
+      <div><h3>Top companies</h3><div id="refCompanies"></div></div>
+      <div><h3>First contacts by month</h3><div id="refMonths"></div></div>
+      <div><h3>Role type</h3><div id="refRoles"></div></div>
+    </div>
+  </section>
+
+  <section class="card" id="referrals">
+    <h2 style="margin-bottom:12px">Referrals</h2>
+    <form id="refAdd" class="row">
+      <input name="name" placeholder="Referrer name" required aria-label="Referrer name">
+      <input name="contact" placeholder="LinkedIn or email (optional)" aria-label="LinkedIn or email">
+      <input type="url" name="url" placeholder="Role link (fills in company and role)" aria-label="Role link">
+      <input name="company" placeholder="Company (optional)" aria-label="Company">
+      <input name="role" placeholder="Role (optional)" aria-label="Role">
+      <label class="noteField">Notes
+        <textarea name="notes" placeholder="How you know them, what they said, next steps, when to follow up…"></textarea></label>
+      <select name="status" id="refAddStatus" aria-label="Status"></select>
+      <button>Add referral</button>
+    </form>
+    <div class="msg" id="refMsg"></div>
+    <div class="row" style="margin:6px 0">
+      <input id="refQ" type="search" autocomplete="off" style="flex:1 1 340px" placeholder="Search name, company, role, notes, status or date…" aria-label="Search referrals">
+      <select id="refFilter" aria-label="Filter by status"></select>
+      <select id="refMonth" aria-label="Filter by month of last activity"></select>
+      <label class="row" style="font-size:13px;color:var(--muted)">Sort
+        <select id="refSort">
+          <option value="recent">Most recent activity</option>
+          <option value="oldest">Oldest activity</option>
+          <option value="added">Recently added</option>
+          <option value="name">Name A–Z</option>
+          <option value="company">Company A–Z</option>
+          <option value="status">Status</option>
+        </select></label>
+    </div>
+    <p id="refInfo" class="sub" style="margin:6px 0"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Referrer</th><th>Company</th><th>Role</th><th>Status</th><th class="hide-sm">Last activity</th><th class="noteHead">Notes</th><th></th></tr></thead>
+        <tbody id="refRows"></tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+</main>
+
+<dialog id="detail"></dialog>
+<dialog id="refDetail"></dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
