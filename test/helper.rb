@@ -1,6 +1,7 @@
 ENV["RACK_ENV"] = "test"
 require_relative "../app"
 require_relative "../import"
+require_relative "../models"
 require "minitest/autorun"
 
 # Empties every table, children first. Rodauth's key tables don't cascade, so they go before accounts;
