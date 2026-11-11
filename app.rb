@@ -34,6 +34,7 @@ class App < Roda
     csp.script_src :self            # app.js and the copied d3 files; nothing inline, no CDNs
     csp.connect_src :self           # the page's own /api calls
     csp.style_src :self, :unsafe_inline
+    csp.font_src :self              # Instrument Sans, served from public/fonts
     csp.img_src :self
     csp.form_action :self
     csp.base_uri :none
