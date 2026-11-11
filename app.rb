@@ -1,5 +1,7 @@
 require_relative "config"
 require_relative "api"
+require_relative "throttle"
+require_relative "bot_guard"
 require "roda"
 require "mail"
 
@@ -21,6 +23,7 @@ Mail.defaults do
 end
 
 class App < Roda
+  use Throttle
   PRODUCTION = ENV["RACK_ENV"] == "production"
 
   plugin :default_headers, {
@@ -39,6 +42,10 @@ class App < Roda
     csp.form_action :self
     csp.base_uri :none
     csp.frame_ancestors :none
+    if Turnstile.enabled? # Cloudflare's bot check loads a script and an iframe on the sign-up page
+      csp.script_src :self, "https://challenges.cloudflare.com"
+      csp.frame_src "https://challenges.cloudflare.com"
+    end
   end
 
   plugin :sessions, secret: ENV.fetch("SESSION_SECRET"), key: "jt.session",
@@ -67,6 +74,32 @@ class App < Roda
     max_invalid_logins 10              # then the account locks until the emailed unlock link is used
     # Closing an account deletes the account row; applications, timeline steps and referrals cascade.
     delete_account_on_close? true
+
+    # Bot protection on sign-up: a hidden field people never fill, Turnstile when configured, and the email cap.
+    create_account_additional_form_tags do
+      honeypot = %(<div class="hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>)
+      check = Turnstile.enabled? ? %(<div class="cf-turnstile" data-sitekey="#{Turnstile.site_key}"></div><script src="#{Turnstile::SCRIPT}" async defer></script>) : ""
+      honeypot + check
+    end
+    before_create_account_route do
+      next unless request.post?
+      unless param("website").empty? # a bot filled the invisible field: act as if it worked, create nothing
+        set_notice_flash verify_account_email_sent_notice_flash
+        redirect login_path
+      end
+      if Turnstile.enabled? && !Turnstile.passed?(param("cf-turnstile-response"), request.ip)
+        set_redirect_error_flash "Please complete the security check and try again."
+        redirect create_account_path
+      end
+      if EmailCap.reached?
+        set_redirect_error_flash EmailCap::Reached.new.message
+        redirect create_account_path
+      end
+    end
+    send_email do |email|
+      EmailCap.take! # raises past the cap, which rolls back whatever triggered the email
+      super(email)
+    end
     login_redirect "/"
     login_return_to_requested_location? true # e.g. back to the bookmarklet popup after logging in
     logout_redirect "/login"
@@ -91,7 +124,12 @@ class App < Roda
 
     r.public
     check_csrf!
-    r.rodauth
+    begin
+      r.rodauth
+    rescue EmailCap::Reached => e
+      flash["error"] = e.message
+      r.redirect "/login"
+    end
     rodauth.require_account # everything below needs a logged-in, verified account
 
     r.root { File.read(File.join(__dir__, "public/index.html")) }
