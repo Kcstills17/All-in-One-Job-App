@@ -29,10 +29,9 @@ bundle exec rake import EMAIL=you@example.com FROM=~/Desktop/Zanes/job-tracker
 
 The import only reads the old files. Running it again syncs the account: edited entries update and new ones get added. Anything deleted in the old app has to be deleted here too. If any count doesn't match, nothing is saved.
 
-## Security
+## Privacy and security
 
-- **Passwords:** hashed with bcrypt and stored in a table owned by a separate database user. The app can check a password but can't read the hashes, so a SQL injection bug can't leak them.
-- **Accounts:** you must verify your email before logging in. After 10 wrong passwords the account locks until the emailed unlock link is used. Password reset works by email, and users can delete their own account.
-- **Every form** carries a CSRF token, a per-form secret that stops other sites from submitting forms as you. Session cookies are HTTP-only, SameSite=Lax, and secure in production.
-- **Headers:** a strict Content-Security-Policy, nosniff, and HSTS in production.
-- **Secrets** live in environment variables only. `.env*` files and job data (`*.json`) are git-ignored.
+- **Your data is encrypted.** Everything you type is encrypted before it's stored, so it can't be read straight out of the database. That covers companies, roles, links, notes and referral contacts.
+- **Only you see your data.** Every account is separate, and the tests check that no account can read or change another's.
+- **Deleting your account deletes your data.** All of it, right away.
+- **Found a security problem?** Please report it privately, as [SECURITY.md](SECURITY.md) explains, not in a public issue.
