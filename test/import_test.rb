@@ -40,6 +40,9 @@ class ImportTest < Minitest::Test
     assert_nil DB[:applications].first(legacy_id: "a1")[:applied_on], "blank dates stay blank"
     assert_operator socket[:id], :>, DB[:applications].first(legacy_id: "a1")[:id], "newest (listed first) gets the highest id"
     assert_equal Date.new(2026, 2, 16), DB[:referrals].first[:first_contact]
+    refute_equal "Socket", socket[:company], "imported text is encrypted"
+    assert_equal ["Socket", "form email"], [Application[socket[:id]].company, Application[socket[:id]].history.last.note]
+    assert_equal "met at meetup", Referral.first.notes
   end
 
   def test_rerun_updates_without_duplicates
@@ -48,7 +51,7 @@ class ImportTest < Minitest::Test
     jobs[0] = jobs[0].merge("notes" => "edited", "history" => jobs[0]["history"] + [{ "stage" => "Ghosted", "on" => "2026-04-01" }])
     write([{ **JOBS[1], "id" => "c3" }] + jobs, REFS)
     assert_equal({ applications: 3, timeline_steps: 5, referrals: 1 }, Import.run("me@example.com", @dir))
-    assert_equal "edited", DB[:applications].first(legacy_id: "b2")[:notes]
+    assert_equal "edited", Application.first(legacy_id: "b2").notes
   end
 
   def test_refuses_unverified_or_unknown_accounts

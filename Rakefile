@@ -19,6 +19,7 @@ task :setup do
         PASSWORD_DATABASE_URL=postgres:///#{name}?user=#{ROLE}_password
         SESSION_SECRET=#{SecureRandom.hex(64)}
         HMAC_SECRET=#{SecureRandom.hex(32)}
+        COLUMN_KEY=#{SecureRandom.hex(32)}
       ENV
     end
     admin.run "CREATE DATABASE #{name} OWNER #{ROLE}" if admin[:pg_database].where(datname: name).empty?

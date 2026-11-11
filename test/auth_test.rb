@@ -89,12 +89,11 @@ class AuthTest < Minitest::Test
 
   def test_closing_an_account_erases_its_data
     other = DB[:accounts].insert(email: "other@example.com", status_id: 2)
-    DB[:referrals].insert(account_id: other, name: "Kept")
+    Referral.create(account_id: other, name: "Kept")
     sign_up
     me = DB[:accounts].where(email: EMAIL).get(:id)
-    app_id = DB[:applications].insert(account_id: me, company: "Acme")
-    DB[:application_events].insert(application_id: app_id, stage: "Applied")
-    DB[:referrals].insert(account_id: me, name: "Kana", notes: "private")
+    app_id = Application.create(account_id: me, company: "Acme").tap { _1.add_event(stage: "Applied") }.id
+    Referral.create(account_id: me, name: "Kana", notes: "private")
 
     submit "/close-account", "password" => PASSWORD
     assert_empty DB[:accounts].where(id: me).all, "account row deleted, not just marked closed"
@@ -102,7 +101,7 @@ class AuthTest < Minitest::Test
     assert_empty DB[:application_events].where(application_id: app_id).all
     assert_empty DB[:referrals].where(account_id: me).all
     assert_empty DB[:account_password_hashes].where(id: me).select(:id).all
-    assert_equal ["Kept"], DB[:referrals].where(account_id: other).select_map(:name), "other accounts untouched"
+    assert_equal ["Kept"], Referral.where(account_id: other).map(&:name), "other accounts untouched"
   end
 
   def test_app_cannot_read_password_hashes
