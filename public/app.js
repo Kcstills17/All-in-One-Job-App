@@ -70,7 +70,7 @@ function setView(v) {
   history.replaceState(null, "", u);
   render();
 }
-$("#tabs").addEventListener("click", e => { const v = e.target.dataset.view; if (v) { setView(v); scrollTo(0, 0); } });
+$("#tabs").addEventListener("click", e => { const v = e.target.closest("[data-view]")?.dataset.view; if (v) { setView(v); scrollTo(0, 0); } });
 
 // ---- Shared chart pieces ----
 function hbars(rows, color) {
@@ -560,8 +560,8 @@ function renderApplications() {
   $("#pipeTitle").textContent = cityPick() ? `Pipeline · ${cityPick()}` : "Pipeline";
 }
 function render() {
-  $("#tabApps").textContent = `Applications (${jobs.length.toLocaleString()})`;
-  $("#tabRefs").textContent = `Referrals (${referrals.length})`;
+  $("#tabApps .count").textContent = jobs.length.toLocaleString();
+  $("#tabRefs .count").textContent = referrals.length;
   ({ applications: renderApplications, referrals: renderReferrals, together: renderTogether })[view]();
 }
 function replaceJob(job) { jobs[jobs.findIndex(j => j.id === job.id)] = job; render(); }
@@ -976,6 +976,7 @@ const scope = new URLSearchParams(location.search).get("scope"); // e.g. /?scope
 if (scope) $("#scope").value = scope;
 showView();
 load();
+addEventListener("themechange", () => { if (jobs.length) render(); }); // charts read colors when they draw
 
 // Live salary preview in the detail panel (an event listener, since the page allows no inline handlers).
 document.addEventListener("input", e => {
