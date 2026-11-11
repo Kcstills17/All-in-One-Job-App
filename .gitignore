@@ -63,3 +63,8 @@ jobs*.json
 referrals*.json
 /data/
 /log/
+
+## Agent instructions and design notes stay local
+CLAUDE.md
+.claude/
+docs/
