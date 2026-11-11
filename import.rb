@@ -1,6 +1,6 @@
 require "json"
 require "date"
-require_relative "config"
+require_relative "models"
 
 # Copies the old app's jobs.json and referrals.json into one verified account. It only reads those
 # files. Re-running it syncs again: rows match on the old id, so edits update in place and new
@@ -24,27 +24,20 @@ module Import
     end
   end
 
+  # Goes through the models so every text field is encrypted. Matching on legacy_id updates in place.
   def self.import_job(account_id, job)
-    row = { account_id: account_id, legacy_id: job["id"], applied_on: date(job["applied_on"]),
-            **%w[company title location pay url notes].to_h { [_1.to_sym, job[_1].to_s] } }
-    id = upsert(:applications, row)
-    events = DB[:application_events].where(application_id: id)
-    events.delete
-    events.import(%i[application_id stage on note],
-                  job["history"].map { [id, _1["stage"], date(_1["on"]), _1["note"].to_s] })
+    app = (Application.first(account_id: account_id, legacy_id: job["id"]) || Application.new(account_id: account_id, legacy_id: job["id"]))
+    app.set(applied_on: date(job["applied_on"]), **%w[company title location pay url notes].to_h { [_1.to_sym, job[_1].to_s] })
+    app.save
+    app.events_dataset.delete
+    job["history"].each { app.add_event(stage: _1["stage"], on: date(_1["on"]), note: _1["note"].to_s) }
   end
 
   def self.import_referral(account_id, ref)
-    row = { account_id: account_id, legacy_id: ref["id"], status: ref["status"],
-            **%w[name contact company role url notes].to_h { [_1.to_sym, ref[_1].to_s] },
-            **%w[first_contact second_contact meeting_on added_on].to_h { [_1.to_sym, date(ref[_1])] } }
-    upsert(:referrals, row)
-  end
-
-  def self.upsert(table, row)
-    DB[table].returning(:id)
-      .insert_conflict(target: %i[account_id legacy_id], update: row.except(:account_id, :legacy_id))
-      .insert(row).first[:id]
+    (Referral.first(account_id: account_id, legacy_id: ref["id"]) || Referral.new(account_id: account_id, legacy_id: ref["id"]))
+      .set(status: ref["status"], **%w[name contact company role url notes].to_h { [_1.to_sym, ref[_1].to_s] },
+           **%w[first_contact second_contact meeting_on added_on].to_h { [_1.to_sym, date(ref[_1])] })
+      .save
   end
 
   # Fails the whole import (nothing saved) unless every old row and timeline step landed.
