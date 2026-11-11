@@ -70,7 +70,7 @@ function setView(v) {
   history.replaceState(null, "", u);
   render();
 }
-$("#tabs").addEventListener("click", e => { const v = e.target.dataset.view; if (v) { setView(v); scrollTo(0, 0); } });
+$("#tabs").addEventListener("click", e => { const v = e.target.closest("[data-view]")?.dataset.view; if (v) { setView(v); scrollTo(0, 0); } });
 
 // ---- Shared chart pieces ----
 function hbars(rows, color) {
@@ -560,8 +560,8 @@ function renderApplications() {
   $("#pipeTitle").textContent = cityPick() ? `Pipeline · ${cityPick()}` : "Pipeline";
 }
 function render() {
-  $("#tabApps").textContent = `Applications (${jobs.length.toLocaleString()})`;
-  $("#tabRefs").textContent = `Referrals (${referrals.length})`;
+  $("#tabApps .count").textContent = jobs.length.toLocaleString();
+  $("#tabRefs .count").textContent = referrals.length;
   ({ applications: renderApplications, referrals: renderReferrals, together: renderTogether })[view]();
 }
 function replaceJob(job) { jobs[jobs.findIndex(j => j.id === job.id)] = job; render(); }
