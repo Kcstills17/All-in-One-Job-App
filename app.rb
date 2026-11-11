@@ -49,7 +49,10 @@ class App < Roda
            :change_password, :lockout, :close_account
     hmac_secret ENV.fetch("HMAC_SECRET")
     # Email links must use the real site address, never the request's Host header.
-    base_url ENV.fetch("APP_URL") if PRODUCTION
+    app_url = PRODUCTION ? ENV.fetch("APP_URL") : ENV.fetch("APP_URL", "http://localhost:4570")
+    base_url app_url
+    domain URI(app_url).host
+    already_logged_in { redirect "/" } # e.g. visiting /login while logged in
     email_from ENV.fetch("MAIL_FROM", "Job Tracker <no-reply@localhost>")
 
     verify_account_set_password? false # pick the password at sign-up
