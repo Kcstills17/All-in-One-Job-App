@@ -32,6 +32,8 @@ module Fetcher
       yc(url)
     when %r{myworkdayjobs\.com/.*/job/}, %r{myworkdaysite\.com/.*/job/}
       workday(url)
+    when %r{apply\.workable\.com/(?:([\w-]+)/)?j/([0-9A-F]+)}i
+      workable($1, $2)
     else
       page_title(url)
     end
@@ -83,6 +85,22 @@ module Fetcher
     parts = uri.path.split("/job/", 2).last.split("/")
     i = parts.index { _1.include?("_") } || parts.size - 1 # the title segment ends in "_<req id>"
     { company: org && titleize(org), title: slug_text(parts[i].split("_").first), location: (slug_text(parts[i - 1]) if i > 0) }
+  end
+
+  # Workable: the page title ("Role - Company") names the company for both link forms
+  # (/<account>/j/<code> and the short /j/<code>). With the account, the job API adds the clean
+  # title, location and remote flag; it has no salary field, so pay comes from the description text.
+  def workable(account, code)
+    page = CGI.unescapeHTML(get("https://apply.workable.com/j/#{code}")[%r{<title[^>]*>(.*?)</title>}mi, 1].to_s.strip)
+    title, _, company = page.rpartition(" - ")
+    info = title.empty? ? { title: page } : { company: company, title: title }
+    return info unless account
+
+    j = get_json("https://apply.workable.com/api/v2/accounts/#{account}/jobs/#{code}")
+    where = %w[city region country].map { j.dig("location", _1) }.reject { _1.to_s.empty? }.join(", ")
+    info.merge(title: j["title"] || info[:title],
+               location: j["remote"] ? ["Remote", ("(#{where})" unless where.empty?)].compact.join(" ") : where,
+               pay: pay([j["description"], j["requirements"], j["benefits"]].join(" ").gsub(/<[^>]+>/, " ")))
   end
 
   # Workday slugs: "---" was " - ", "--" was punctuation like ", ", "-" was a space.

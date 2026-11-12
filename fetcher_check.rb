@@ -7,7 +7,8 @@ require_relative "fetcher"
   "https://jobs.lever.co/spreedly/3a6264ff-2a29-41d4-95fa-fa52b86e9c69" => "Spreedly",
   "https://www.linkedin.com/jobs/view/4479064983" => "EasyPost",
   "https://www.ycombinator.com/companies/agave/jobs/U0de7Gn-technical-support-engineer" => "Agave",
-  "https://www.workatastartup.com/jobs/85660" => "Drillbit"
+  "https://www.workatastartup.com/jobs/85660" => "Drillbit",
+  "https://apply.workable.com/bask-health-1/j/7E3C450C5D/" => "Bask Health"
 }.each do |url, company|
   info = Fetcher.fetch(url)
   ok = info[:company].to_s.include?(company) && !info[:title].to_s.empty?

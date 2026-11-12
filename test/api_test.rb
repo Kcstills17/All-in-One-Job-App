@@ -3,10 +3,6 @@ require_relative "helper"
 require "rack/test"
 require "bcrypt"
 
-module Fetcher
-  def self.fetch(_url) = { company: "Fetched Co", title: "Fetched Role", location: "Remote", pay: "$100K" } # no network in tests
-end
-
 class ApiTest < Minitest::Test
   include Rack::Test::Methods
 
@@ -17,7 +13,11 @@ class ApiTest < Minitest::Test
     reset_db!
     @me = make_account("me@example.com")
     @other = make_account("other@example.com")
+    @fetch = Fetcher.method(:fetch) # no network in tests; restored so other tests get the real one
+    Fetcher.define_singleton_method(:fetch) { |_url| { company: "Fetched Co", title: "Fetched Role", location: "Remote", pay: "$100K" } }
   end
+
+  def teardown = Fetcher.define_singleton_method(:fetch, @fetch)
 
   def make_account(email)
     id = DB[:accounts].insert(email: email, status_id: 2)
