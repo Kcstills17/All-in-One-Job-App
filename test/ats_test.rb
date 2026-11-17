@@ -21,6 +21,10 @@ class AtsTest < Minitest::Test
       LD[{ "@type" => "JobPosting", title: "DVT Manager", hiringOrganization: "Enphase Energy", jobLocationType: "TELECOMMUTE",
            jobLocation: [{ address: { addressCountry: "New Zealand" } }],
            baseSalary: { currency: "", value: { minValue: "", maxValue: "", unitText: "" } }, description: "<p>Pay $40/hr</p>" }],
+    # Only the job page: the board API isn't stubbed, so this fails if Ashby goes back to needing it.
+    "https://jobs.ashbyhq.com/talkiatry/4343b2d6-b89f-4534-b208-515963523015" =>
+      LD[{ "@type" => "JobPosting", title: "Software Engineer DOLCE", hiringOrganization: { name: "Talkiatry" },
+           jobLocationType: "TELECOMMUTE", baseSalary: { currency: "USD", value: { minValue: 130000, maxValue: 145000, unitText: "YEAR" } } }],
     "https://peregrine.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" =>
       "<title>Software Engineer - Peregrine Team - Career Page</title>"
   }
@@ -57,6 +61,11 @@ class AtsTest < Minitest::Test
   def test_json_ld_with_string_org_and_blank_salary
     assert_fills({ company: "Enphase Energy", title: "DVT Manager", location: "Remote (New Zealand)", pay: "$40/hr" },
                  "https://jobs.example.com/job/2")
+  end
+
+  def test_ashby_reads_the_job_page
+    assert_fills({ company: "Talkiatry", title: "Software Engineer DOLCE", location: "Remote", pay: "$130,000 - $145,000 per year" },
+                 "https://jobs.ashbyhq.com/talkiatry/4343b2d6-b89f-4534-b208-515963523015?embed=true&utm_source=Simplify")
   end
 
   def test_jazzhr_page_title
