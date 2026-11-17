@@ -15,7 +15,8 @@ require_relative "fetcher"
   "https://jobs.recruitee.com/o/campaign-manager-france" => "Tellent",
   "https://career.teamtailor.com/jobs/8706432-enterprise-account-executive-chicago" => "Teamtailor",
   "https://jobs.jobvite.com/enphase-energy/job/oz4NAfwK" => "Enphase Energy",
-  "https://peregrineteam.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" => "Peregrine Team"
+  "https://peregrineteam.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" => "Peregrine Team",
+  "https://jobright.ai/jobs/info/6908e6a0bcccf20de59d48ca" => "Scale AI"
 }.each do |url, company|
   info = Fetcher.fetch(url)
   ok = info[:company].to_s.include?(company) && !info[:title].to_s.empty?
