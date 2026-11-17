@@ -34,6 +34,8 @@ module Fetcher
       workday(url)
     when %r{apply\.workable\.com/(?:([\w-]+)/)?j/([0-9A-F]+)}i
       workable($1, $2)
+    when %r{ats\.rippling\.com/(?:[a-z]{2}-[A-Z]{2}/)?([\w-]+)/jobs/([0-9a-f-]{36})}
+      rippling($1, $2)
     else
       page_title(url)
     end
@@ -101,6 +103,16 @@ module Fetcher
     info.merge(title: j["title"] || info[:title],
                location: j["remote"] ? ["Remote", ("(#{where})" unless where.empty?)].compact.join(" ") : where,
                pay: pay([j["description"], j["requirements"], j["benefits"]].join(" ").gsub(/<[^>]+>/, " ")))
+  end
+
+  # Rippling's public board API returns the company name and structured pay ranges.
+  def rippling(board, id)
+    j = get_json("https://api.rippling.com/platform/api/ats/v1/board/#{board}/jobs/#{id}")
+    r = j["payRangeDetails"]&.first
+    money = ->(n) { "$#{n.round.to_s.reverse.scan(/\d{1,3}/).join(',').reverse}" }
+    { company: j["companyName"] || titleize(board), title: j["name"], location: Array(j["workLocations"]).join("; "),
+      pay: r ? "#{money[r['rangeStart']]} - #{money[r['rangeEnd']]} per #{r['frequency'].to_s.downcase}" :
+                pay(Array(j["description"]&.values).join(" ").gsub(/<[^>]+>/, " ")) }
   end
 
   # Workday slugs: "---" was " - ", "--" was punctuation like ", ", "-" was a space.
