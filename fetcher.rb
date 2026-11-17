@@ -34,6 +34,14 @@ module Fetcher
       workday(url)
     when %r{apply\.workable\.com/(?:([\w-]+)/)?j/([0-9A-F]+)}i
       workable($1, $2)
+    when %r{ats\.rippling\.com/(?:[a-z]{2}-[A-Z]{2}/)?([\w-]+)/jobs/([0-9a-f-]{36})}
+      rippling($1, $2)
+    when %r{jobs\.smartrecruiters\.com/([^/?]+)/(\d+)}
+      smartrecruiters($1, $2)
+    when %r{([\w-]+)\.recruitee\.com/o/([^/?#]+)}
+      recruitee($1, $2)
+    when %r{([\w-]+)\.breezy\.hr/p/([^/?#]+)}
+      breezy($1, $2)
     else
       page_title(url)
     end
@@ -103,14 +111,87 @@ module Fetcher
                pay: pay([j["description"], j["requirements"], j["benefits"]].join(" ").gsub(/<[^>]+>/, " ")))
   end
 
+  # Rippling's public board API returns the company name and structured pay ranges.
+  def rippling(board, id)
+    j = get_json("https://api.rippling.com/platform/api/ats/v1/board/#{board}/jobs/#{id}")
+    r = j["payRangeDetails"]&.first
+    { company: j["companyName"] || titleize(board), title: j["name"], location: Array(j["workLocations"]).join("; "),
+      pay: r ? range(r["rangeStart"], r["rangeEnd"], r["currency"], r["frequency"]) :
+                pay(text(Array(j["description"]&.values).join(" "))) }
+  end
+
+  def smartrecruiters(company, id)
+    j = get_json("https://api.smartrecruiters.com/v1/companies/#{company}/postings/#{id}")
+    l = j["location"] || {}
+    where = [l["city"], l["region"], l["country"]&.upcase].reject { _1.to_s.empty? }.join(", ")
+    c = j["compensation"]
+    { company: j.dig("company", "name") || titleize(company), title: j["name"],
+      location: l["remote"] ? "Remote (#{where})" : where,
+      pay: c ? range(c["min"], c["max"], c["currency"], c["period"]) : pay(text(j.dig("jobAd", "sections").to_s)) }
+  end
+
+  def recruitee(company, slug)
+    o = get_json("https://#{company}.recruitee.com/api/offers/#{slug}")["offer"]
+    s = o["salary"] || {}
+    { company: o["company_name"] || titleize(company), title: o["title"],
+      location: o["remote"] ? "Remote (#{o['location']})" : o["location"],
+      pay: !s["min"].to_s.empty? ? range(s["min"], s["max"], s["currency"], s["period"]) : pay(text(o["description"])) }
+  end
+
+  # Breezy has no per-job API; the board's /json list carries every posting.
+  def breezy(company, friendly_id)
+    j = get_json("https://#{company}.breezy.hr/json").find { _1["friendly_id"] == friendly_id || friendly_id.start_with?("#{_1['id']}-") } or return page_title("https://#{company}.breezy.hr/p/#{friendly_id}")
+    loc = j.dig("location", "name")
+    { company: j.dig("company", "name") || titleize(company), title: j["name"],
+      location: j.dig("location", "is_remote") ? "Remote (#{loc})" : loc, pay: j["salary"] }
+  end
+
+  # schema.org JobPosting embedded in the page: Teamtailor, Jobvite, iCIMS and many company sites.
+  def json_ld(html)
+    html.scan(%r{<script[^>]*application/ld\+json[^>]*>(.*?)</script>}mi).flatten.each do |raw|
+      data = JSON.parse(raw) rescue next
+      data = data["@graph"] if data.is_a?(Hash) && data["@graph"]
+      j = (data.is_a?(Array) ? data : [data]).find { _1.is_a?(Hash) && _1["@type"] == "JobPosting" } or next
+      places = Array(j["jobLocation"]).map do |p|
+        a = p.is_a?(Hash) ? p["address"] : nil
+        a.is_a?(Hash) ? [a["addressLocality"], a["addressRegion"], a["addressCountry"].then { _1.is_a?(Hash) ? _1["name"] : _1 }].reject { _1.to_s.empty? }.uniq.join(", ") : a.to_s
+      end.reject(&:empty?)
+      where = places.join("; ")
+      where = where.empty? ? "Remote" : "Remote (#{where})" if j["jobLocationType"].to_s.upcase == "TELECOMMUTE"
+      s = j["baseSalary"].is_a?(Hash) ? j["baseSalary"] : {}
+      v = s["value"].is_a?(Hash) ? s["value"] : {}
+      org = j["hiringOrganization"]
+      return { company: org.is_a?(Hash) ? org["name"] : org, title: CGI.unescapeHTML(j["title"].to_s), location: where,
+               pay: !v["minValue"].to_s.empty? ? range(v["minValue"], v["maxValue"] || v["minValue"], s["currency"], v["unitText"]) : pay(text(CGI.unescapeHTML(j["description"].to_s))) }
+    end
+    nil
+  end
+
+  # "$125,000 - $145,000 per year" from structured pay fields.
+  def range(min, max, currency, period)
+    money = ->(n) { "#{currency.to_s.upcase.then { _1.empty? || _1 == 'USD' ? '$' : "#{_1} " }}#{n.to_f.round.to_s.reverse.scan(/\d{1,3}/).join(',').reverse}" }
+    per = period.to_s.downcase.sub(/ly\z/, "").sub("dai", "day")
+    [money[min], (" - #{money[max]}" if max && max.to_f != min.to_f), (" per #{per}" unless per.empty?)].join
+  end
+
+  def text(html) = html.to_s.gsub(/<[^>]+>/, " ")
+
   # Workday slugs: "---" was " - ", "--" was punctuation like ", ", "-" was a space.
   def slug_text(slug) = slug.gsub(/---|--|-/, "---" => " - ", "--" => ", ", "-" => " ").sub(/[,\s]+\z/, "").strip
 
   def page_title(url)
-    t = CGI.unescapeHTML(get(url)[%r{<title[^>]*>(.*?)</title>}mi, 1].to_s.strip)
+    html = get(url)
+    if (info = json_ld(html)) && !info[:title].empty?
+      return info.reject { |_, v| v.to_s.empty? }
+    end
+    t = CGI.unescapeHTML(html[%r{<title[^>]*>(.*?)</title>}mi, 1].to_s.strip)
     # LinkedIn: "Support Engineer at Acme — Remote | LinkedIn"
     if (m = t.match(/\A(.+?) at (.+?)(?: [—|-] (.+?))? \| LinkedIn/))
       return { title: m[1], company: m[2], location: m[3] }
+    end
+    # JazzHR (applytojob.com): "Software Engineer - Peregrine Team - Career Page"
+    if (m = t.match(/\A(.+) - (.+?) - Career Page\z/))
+      return { title: m[1], company: m[2] }
     end
     { title: t, company: URI(url).host.sub(/\Awww\./, ""), fallback: true }
   end
