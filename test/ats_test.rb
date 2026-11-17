@@ -25,6 +25,10 @@ class AtsTest < Minitest::Test
     "https://jobs.ashbyhq.com/talkiatry/4343b2d6-b89f-4534-b208-515963523015" =>
       LD[{ "@type" => "JobPosting", title: "Software Engineer DOLCE", hiringOrganization: { name: "Talkiatry" },
            jobLocationType: "TELECOMMUTE", baseSalary: { currency: "USD", value: { minValue: 130000, maxValue: 145000, unitText: "YEAR" } } }],
+    "https://jobright.ai/jobs/info/6908e6a0bcccf20de59d48ca" =>
+      %(<script id="__NEXT_DATA__" type="application/json">#{{ props: { pageProps: { dataSource: {
+        jobResult: { jobTitle: "Forward Deployed Engineer, GenAI", jobLocation: "NYC Metro Area", isRemote: false, salaryDesc: "$179K/yr - $224K/yr" },
+        companyResult: { companyName: "Scale AI" } } } } }.to_json}</script>),
     "https://peregrine.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" =>
       "<title>Software Engineer - Peregrine Team - Career Page</title>"
   }
@@ -66,6 +70,11 @@ class AtsTest < Minitest::Test
   def test_ashby_reads_the_job_page
     assert_fills({ company: "Talkiatry", title: "Software Engineer DOLCE", location: "Remote", pay: "$130,000 - $145,000 per year" },
                  "https://jobs.ashbyhq.com/talkiatry/4343b2d6-b89f-4534-b208-515963523015?embed=true&utm_source=Simplify")
+  end
+
+  def test_jobright
+    assert_fills({ company: "Scale AI", title: "Forward Deployed Engineer, GenAI", location: "NYC Metro Area", pay: "$179K/yr - $224K/yr" },
+                 "https://jobright.ai/jobs/info/6908e6a0bcccf20de59d48ca?utm_source=share")
   end
 
   def test_jazzhr_page_title

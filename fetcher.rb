@@ -42,6 +42,8 @@ module Fetcher
       recruitee($1, $2)
     when %r{([\w-]+)\.breezy\.hr/p/([^/?#]+)}
       breezy($1, $2)
+    when %r{jobright\.ai/jobs/info/(\w+)}
+      jobright($1)
     else
       page_title(url)
     end
@@ -148,6 +150,15 @@ module Fetcher
     loc = j.dig("location", "name")
     { company: j.dig("company", "name") || titleize(company), title: j["name"],
       location: j.dig("location", "is_remote") ? "Remote (#{loc})" : loc, pay: j["salary"] }
+  end
+
+  # Jobright's job page is a Next.js app with the job in __NEXT_DATA__. Search links
+  # (/jobs/search?...position=N) carry no job id and sit behind a bot check, so only /jobs/info/<id> works.
+  def jobright(id)
+    ds = JSON.parse(get("https://jobright.ai/jobs/info/#{id}")[%r{<script id="__NEXT_DATA__"[^>]*>(.*?)</script>}m, 1]).dig("props", "pageProps", "dataSource")
+    j = ds["jobResult"]
+    { company: ds.dig("companyResult", "companyName"), title: j["jobTitle"],
+      location: j["isRemote"] ? "Remote (#{j['jobLocation']})" : j["jobLocation"], pay: j["salaryDesc"] }
   end
 
   # schema.org JobPosting embedded in the page: Teamtailor, Jobvite, iCIMS and many company sites.
