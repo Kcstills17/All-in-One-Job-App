@@ -54,7 +54,11 @@ module Fetcher
     { company: titleize(org), title: j["title"], location: j.dig("location", "name"), pay: pay(CGI.unescapeHTML(j["content"].to_s)) }
   end
 
+  # The job page (~35KB) embeds a JobPosting; the board API lists every job with full descriptions
+  # and passes MAX_BYTES on big boards (Talkiatry's 190 jobs), so it's only the fallback.
   def ashby(org, id)
+    info = json_ld(get("https://jobs.ashbyhq.com/#{org}/#{id}")) rescue nil
+    return info.reject { |_, v| v.to_s.empty? } if info && !info[:title].empty?
     jobs = get_json("https://api.ashbyhq.com/posting-api/job-board/#{org}?includeCompensation=true")["jobs"]
     j = jobs.find { _1["id"] == id } or return { company: titleize(org) }
     # Ashby flags remote roles separately ("Eastern Time zone" + isRemote) — fold that into the text.

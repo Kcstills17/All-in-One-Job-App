@@ -4,6 +4,7 @@ require_relative "fetcher"
 {
   "https://job-boards.greenhouse.io/bugcrowd/jobs/8334498" => "Bugcrowd",
   "https://jobs.ashbyhq.com/checkly/0d236bb0-f860-4317-bc1c-84fed94d0f5a" => "Checkly",
+  "https://jobs.ashbyhq.com/talkiatry/4343b2d6-b89f-4534-b208-515963523015" => "Talkiatry",
   "https://jobs.lever.co/spreedly/3a6264ff-2a29-41d4-95fa-fa52b86e9c69" => "Spreedly",
   "https://www.linkedin.com/jobs/view/4479064983" => "EasyPost",
   "https://www.ycombinator.com/companies/agave/jobs/U0de7Gn-technical-support-engineer" => "Agave",
