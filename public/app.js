@@ -67,6 +67,7 @@ let view = VIEWS.find(v => v === new URLSearchParams(location.search).get("view"
 function showView() {
   VIEWS.forEach(v => { $(`#view-${v}`).hidden = v !== view; });
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+  document.querySelector(".sideTrash").setAttribute("aria-current", view === "trash" ? "page" : "false");
 }
 function setView(v) {
   view = v; showView();
