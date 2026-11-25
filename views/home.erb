@@ -1,6 +1,30 @@
 <h1>Account</h1>
 <p>Logged in as <b><%= rodauth.account[:email] %></b>.</p>
 <p><a href="/">← Back to your applications</a></p>
+<h2 style="font-size:17px;margin:20px 0 6px">Gmail</h2>
+<% connection = GmailToken[rodauth.session_value] %>
+<% if @gmail_token %>
+  <p class="flash notice" role="status">Your Gmail script token. Copy it now: it's shown only this once.</p>
+  <input type="text" readonly value="<%= @gmail_token %>" aria-label="Gmail script token" style="font-family:monospace">
+  <ol class="muted" style="padding-left:20px;font-size:15px">
+    <li>Open <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com</a> while signed in to the Gmail account you apply from.</li>
+    <li>Replace the code with <a href="https://github.com/Kcstills17/All-in-One-Job-App/blob/main/apps_script/gmail_to_job_tracker.gs" target="_blank" rel="noopener">this script</a>.</li>
+    <li>In it, set <code>APP_URL</code> to <code><%= rodauth.base_url %></code> and <code>TOKEN</code> to the token above, then save.</li>
+    <li>Run <code>setup</code> once and allow access when Google asks. It scans your mail since your first application, then checks every hour.</li>
+  </ol>
+<% elsif connection %>
+  <p style="margin:0 0 8px">Connected<%= connection.last_used_at ? ", last sync #{connection.last_used_at.strftime('%b %-d, %-I:%M %p')} UTC" : ", waiting for the script's first sync" %>.</p>
+<% else %>
+  <p class="muted" style="margin:0 0 8px">A small script in your own Google account sends job emails here every hour. The app keeps only who sent it, the subject and the deciding sentence, encrypted, never the email itself. Nothing changes until you approve it.</p>
+<% end %>
+<div class="row" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+  <form method="post" action="/account/gmail-token"><%== csrf_tag("/account/gmail-token") %>
+    <button type="submit"><%= connection ? "Make a new token" : "Connect Gmail" %></button></form>
+  <% if connection %>
+    <form method="post" action="/account/gmail-revoke"><%== csrf_tag("/account/gmail-revoke") %>
+      <button type="submit" class="secondary" style="margin:0">Disconnect</button></form>
+  <% end %>
+</div>
 <div class="nav">
   <a href="<%= rodauth.change_password_path %>">Change password</a>
   <a href="<%= rodauth.close_account_path %>">Delete account</a>
