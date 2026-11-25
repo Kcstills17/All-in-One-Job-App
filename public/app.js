@@ -1,4 +1,4 @@
-let STAGES = [], jobs = [], leads = [], LOCS = [];
+let STAGES = [], jobs = [], leads = [], LOCS = [], resumeList = [];
 const OUTCOMES = new Set(["Offer", "Accepted", "Rejected", "Ghosted", "Withdrawn"]);
 const INTERVIEWS = new Set(["Recruiter Screen", "Hiring Manager", "Technical Interview", "Take-home", "Final Round", "Work Trial", "Offer", "Accepted"]);
 const PENDING = "No response yet";
@@ -47,8 +47,8 @@ $("#bm").href = `javascript:(()=>{window.open('${location.origin}/add?url='+enco
 
 async function load() {
   let refData, all;
-  [STAGES, all, LOCS, refData] = await Promise.all([api("/api/stages"), api("/api/jobs"), api("/api/locations"),
-    api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true })), loadPrep()]);
+  [STAGES, all, LOCS, refData, resumeList] = await Promise.all([api("/api/stages"), api("/api/jobs"), api("/api/locations"),
+    api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true })), api("/api/resumes"), loadPrep()]);
   // Saved leads aren't applications yet: they get their own tab and stay out of every stat and chart.
   STAGES = STAGES.filter(s => s !== "Saved");
   leads = all.filter(isLead); jobs = all.filter(j => !isLead(j));
@@ -628,8 +628,53 @@ $("#upcoming").addEventListener("click", e => {
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
+// ---- Resume versions (logic in resumes.js). Stats follow the location filter, like the Overview. ----
+const pct = (n, of) => of ? `${Math.round(100 * n / of)}%` : "—";
+let resumeEditing = null;
+function renderResumes() {
+  const today = ymd(new Date()), current = resumeFor({ applied_on: today }, resumeList);
+  const rows = resumeList.length ? resumeStats(visible(), resumeList, responded, interviewedJ) : [];
+  $("#resumeRows").innerHTML = rows.map(({ resume: r, sent, responses, interviews }) => `<tr data-id="${r?.id || ""}">
+    <td>${r ? `<b>${esc(r.name)}</b>${r === current ? ` <span class="pill">current</span>` : ""}${webLink(r.url) ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener" title="Open file">↗</a>` : ""}
+      ${r.notes ? `<div class="sub" style="margin:2px 0 0">${esc(r.notes)}</div>` : ""}` : `<span class="sub" style="margin:0">No version (before your first)</span>`}</td>
+    <td style="white-space:nowrap">${r ? esc(r.started_on) : "—"}</td>
+    <td>${sent.toLocaleString()}</td>
+    <td title="${responses} of ${sent}">${pct(responses, sent)} <span class="sub" style="margin:0">(${responses})</span></td>
+    <td title="${interviews} of ${sent}">${pct(interviews, sent)} <span class="sub" style="margin:0">(${interviews})</span></td>
+    <td style="white-space:nowrap">${r ? `<button type="button" class="ghost resEdit">Edit</button> <button type="button" class="ghost resDel" aria-label="Delete ${esc(r.name)}">✕</button>` : ""}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="sub">No versions yet. Add the resume you're sending now, with the date you started sending it.</td></tr>`;
+  const f = $("#resumeForm");
+  if (!f.started_on.value) f.started_on.value = today;
+}
+$("#resumeForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const res = await api(resumeEditing ? `/api/resumes/${resumeEditing}` : "/api/resumes",
+    { method: resumeEditing ? "PATCH" : "POST", body: JSON.stringify(data) });
+  if (res.error) return void ($("#resumeMsg").textContent = `Error: ${res.error}`);
+  resumeList = await api("/api/resumes");
+  $("#resumeMsg").textContent = `${resumeEditing ? "Saved" : "Added"}: ${res.name}`;
+  resumeCancel(); render();
+});
+function resumeCancel() {
+  resumeEditing = null; $("#resumeForm").reset(); $("#resumeSave").textContent = "Add version"; $("#resumeCancel").hidden = true;
+}
+$("#resumeCancel").addEventListener("click", () => { resumeCancel(); renderResumes(); });
+$("#resumeRows").addEventListener("click", async e => {
+  const id = e.target.closest("tr")?.dataset.id, r = resumeList.find(x => x.id === id); if (!r) return;
+  if (e.target.matches(".resEdit")) {
+    const f = $("#resumeForm"); resumeEditing = id;
+    for (const k of ["name", "url", "started_on", "notes"]) f[k].value = r[k];
+    $("#resumeSave").textContent = "Save changes"; $("#resumeCancel").hidden = false; f.name.focus();
+  }
+  if (e.target.matches(".resDel") && confirm(`Delete ${r.name}? Applications that picked it go back to "by date".`)) {
+    await api(`/api/resumes/${id}`, { method: "DELETE" });
+    await load();
+  }
+});
+
 function renderApplications() {
-  renderUpcoming(); renderFollowUps(); renderGoals(); renderCities(); renderStats(); renderChart(); renderSalary(); renderTable();
+  renderUpcoming(); renderFollowUps(); renderGoals(); renderResumes(); renderCities(); renderStats(); renderChart(); renderSalary(); renderTable();
   $("#pipeTitle").textContent = cityPick() ? `Pipeline · ${cityPick()}` : "Pipeline";
 }
 function render() {
@@ -1046,6 +1091,9 @@ function openDetail(id) {
         <input name="pay" value="${esc(j.pay)}" placeholder="120k · 100–140k · $45/hr"></label>
       <label>Applied on<input type="date" name="applied_on" value="${esc(j.applied_on)}"></label>
       <label>Posting link<input name="url" value="${esc(j.url)}"></label>
+      <label>Resume version<select name="resume_id">
+        <option value="">By date${(r => r ? ` (${esc(r.name)})` : " (none yet)")(resumeFor({ ...j, resume_id: null }, resumeList))}</option>
+        ${resumeList.map(r => `<option value="${r.id}" ${r.id === j.resume_id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></label>
       <label style="grid-column:1/-1">Notes<textarea name="notes">${esc(j.notes)}</textarea></label>
       <div><button>Save details</button></div>
     </form>
