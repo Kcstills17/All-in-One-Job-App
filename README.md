@@ -29,6 +29,12 @@ bundle exec rake import EMAIL=you@example.com FROM=~/Desktop/Zanes/job-tracker
 
 The import only reads the old files. Running it again syncs the account: edited entries update and new ones get added. Anything deleted in the old app has to be deleted here too. If any count doesn't match, nothing is saved.
 
+### Moving an account to another database
+
+`bundle exec rake export EMAIL=you@example.com TO=dir` writes the account as `jobs.json` and `referrals.json`, the files `rake import` reads. Import them on the other side, then delete the files: they're plain text.
+
+While sign-ups are closed, make the account first with `bundle exec rake create_account EMAIL=you@example.com`. It asks for a password and skips the verification email.
+
 ## Privacy and security
 
 - **Your data is encrypted.** Everything you type is encrypted before it's stored, so it can't be read straight out of the database. That covers companies, roles, links, notes and referral contacts.
