@@ -10,7 +10,7 @@ module Export
     # Newest first, like the old app's files. Rows without an old id get a stable one from this database.
     id = ->(row) { row.legacy_id || "web-#{row.id}" }
     jobs = Application.where(account_id: account_id).order(Sequel.desc(:id)).all.map do |a|
-      { "id" => id[a], "applied_on" => a.applied_on.to_s, **%w[company title location pay url notes].to_h { [_1, a.public_send(_1)] },
+      { "id" => id[a], "applied_on" => a.applied_on.to_s, **%w[company title location pay url notes prep].to_h { [_1, a.public_send(_1)] },
         "history" => a.history.map { { "stage" => _1.stage, "on" => _1.on.to_s, "at" => _1.at.to_s, "note" => _1.note } } }
     end
     refs = Referral.where(account_id: account_id).order(Sequel.desc(:id)).all.map do |r|

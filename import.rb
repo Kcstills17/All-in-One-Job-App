@@ -27,7 +27,7 @@ module Import
   # Goes through the models so every text field is encrypted. Matching on legacy_id updates in place.
   def self.import_job(account_id, job)
     app = (Application.first(account_id: account_id, legacy_id: job["id"]) || Application.new(account_id: account_id, legacy_id: job["id"]))
-    app.set(applied_on: date(job["applied_on"]), **%w[company title location pay url notes].to_h { [_1.to_sym, job[_1].to_s] })
+    app.set(applied_on: date(job["applied_on"]), **%w[company title location pay url notes prep].to_h { [_1.to_sym, job[_1].to_s] })
     app.save
     app.events_dataset.delete
     job["history"].each { app.add_event(stage: _1["stage"], on: date(_1["on"]), at: _1["at"].to_s.empty? ? nil : _1["at"], note: _1["note"].to_s) }
