@@ -19,6 +19,20 @@ class BotProtectionTest < Minitest::Test
                               "password-confirm" => "correct horse battery", "_csrf" => token }.merge(extra)
   end
 
+  def test_closed_sign_ups_create_nothing
+    ENV["SIGNUPS_OPEN"] = "false"
+    get "/create-account"
+    assert_equal "/login", URI(last_response.location).path
+    follow_redirect!
+    assert_includes last_response.body, "Sign-ups are closed"
+    refute_includes last_response.body, "Create account"
+    post "/create-account", "login" => "new@example.com", "password" => "correct horse battery",
+                            "password-confirm" => "correct horse battery"
+    assert_equal 0, DB[:accounts].count
+  ensure
+    ENV.delete("SIGNUPS_OPEN")
+  end
+
   def test_honeypot_creates_nothing_and_looks_normal
     sign_up("bot@example.com", "website" => "http://spam.example")
     assert last_response.redirect?

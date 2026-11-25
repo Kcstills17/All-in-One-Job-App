@@ -2,6 +2,12 @@ require "net/http"
 require "json"
 require_relative "config"
 
+# SIGNUPS_OPEN=true lets new people create accounts. Production keeps sign-ups closed unless it's set,
+# so only existing accounts can log in; development and tests leave them open.
+module Signups
+  def self.open? = ENV.fetch("SIGNUPS_OPEN", (ENV["RACK_ENV"] != "production").to_s) == "true"
+end
+
 # Daily cap on emails the app sends. It stays under the email provider's free limit (Resend: 100/day),
 # so a flood of fake sign-ups can't get the account suspended or block real users' emails.
 module EmailCap
