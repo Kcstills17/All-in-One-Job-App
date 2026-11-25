@@ -1,6 +1,13 @@
 <h1>Account</h1>
 <p>Logged in as <b><%= rodauth.account[:email] %></b>.</p>
 <p><a href="/">← Back to your applications</a></p>
+<h2 style="font-size:17px;margin:20px 0 6px">Your data</h2>
+<p class="muted" style="margin:0 0 8px">Everything you've saved, except what's in Trash. The files aren't encrypted, so keep them somewhere safe.</p>
+<ul style="margin:0 0 16px;padding-left:20px">
+  <li><a href="/api/export/all.json" download>Everything (JSON)</a>: applications, referrals, company notes, prep library and resume versions</li>
+  <li><a href="/api/export/applications.csv" download>Applications (CSV)</a>, for a spreadsheet</li>
+  <li><a href="/api/export/referrals.csv" download>Referrals (CSV)</a></li>
+</ul>
 <div class="nav">
   <a href="<%= rodauth.change_password_path %>">Change password</a>
   <a href="<%= rodauth.close_account_path %>">Delete account</a>

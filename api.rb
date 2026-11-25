@@ -3,6 +3,7 @@ require "uri"
 require_relative "models"
 require_relative "fetcher"
 require_relative "locations"
+require_relative "export"
 
 # The JSON API the page calls, ported from the local app with the same paths and payloads.
 # Every lookup starts from the logged-in account's rows, so another user's ids simply aren't found.
@@ -17,6 +18,19 @@ module Api
     r.get("session") { { email: rodauth.account[:email], csrf: csrf_token } }
     r.get("stages") { STAGES }
     r.get("locations") { Locations::ALL }
+
+    # Download your data. Plain GETs are fine: a page on another site can start the download, but the
+    # browser saves it for you and that site never gets to read it.
+    r.on "export" do
+      stamp = Date.today.iso8601
+      download = ->(name, type) do
+        response["content-type"] = type
+        response["content-disposition"] = %(attachment; filename="job-tracker-#{name}-#{stamp}.#{type[/json|csv/]}")
+      end
+      r.get("all.json") { download.("all", "application/json"); JSON.pretty_generate(Export.data(account_id)) }
+      r.get("applications.csv") { download.("applications", "text/csv; charset=utf-8"); Export.applications_csv(account_id) }
+      r.get("referrals.csv") { download.("referrals", "text/csv; charset=utf-8"); Export.referrals_csv(account_id) }
+    end
 
     r.on "jobs" do
       r.is do
