@@ -30,7 +30,7 @@ module Import
     app.set(applied_on: date(job["applied_on"]), **%w[company title location pay url notes].to_h { [_1.to_sym, job[_1].to_s] })
     app.save
     app.events_dataset.delete
-    job["history"].each { app.add_event(stage: _1["stage"], on: date(_1["on"]), note: _1["note"].to_s) }
+    job["history"].each { app.add_event(stage: _1["stage"], on: date(_1["on"]), at: _1["at"].to_s.empty? ? nil : _1["at"], note: _1["note"].to_s) }
   end
 
   def self.import_referral(account_id, ref)

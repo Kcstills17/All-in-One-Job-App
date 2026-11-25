@@ -11,7 +11,7 @@ module Export
     id = ->(row) { row.legacy_id || "web-#{row.id}" }
     jobs = Application.where(account_id: account_id).order(Sequel.desc(:id)).all.map do |a|
       { "id" => id[a], "applied_on" => a.applied_on.to_s, **%w[company title location pay url notes].to_h { [_1, a.public_send(_1)] },
-        "history" => a.history.map { { "stage" => _1.stage, "on" => _1.on.to_s, "note" => _1.note } } }
+        "history" => a.history.map { { "stage" => _1.stage, "on" => _1.on.to_s, "at" => _1.at.to_s, "note" => _1.note } } }
     end
     refs = Referral.where(account_id: account_id).order(Sequel.desc(:id)).all.map do |r|
       { "id" => id[r], "status" => r.status, **Referral::TEXT.to_h { [_1.to_s, r.public_send(_1)] },

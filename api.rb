@@ -104,7 +104,15 @@ module Api
 
   def event_attrs(params)
     raise Invalid, "unknown stage #{params['stage']}" unless STAGES.include?(params["stage"])
-    { stage: params["stage"], on: date!(params["on"]) || Date.today, note: params["note"].to_s }
+    { stage: params["stage"], on: date!(params["on"]) || Date.today, at: time!(params["at"]), note: params["note"].to_s }
+  end
+
+  # "HH:MM" (24-hour, what <input type="time"> sends) or blank.
+  def time!(value)
+    value = value.to_s.strip
+    return nil if value.empty?
+    raise Invalid, "times look like 14:30" unless value.match?(/\A([01]\d|2[0-3]):[0-5]\d\z/)
+    value
   end
 
   # Parsed job data beats the browser tab's title ("Role at Company | Site"); the tab beats a scraped <title>.

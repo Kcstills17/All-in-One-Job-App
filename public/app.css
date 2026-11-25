@@ -207,7 +207,7 @@
   .timeline { list-style:none; margin:12px 0; padding:0 0 0 14px; border-left:2px solid var(--line); }
   .timeline li { position:relative; padding:0 0 14px 12px; }
   .timeline li::before { content:""; position:absolute; left:-21px; top:6px; width:12px; height:12px; border-radius:50%; background:var(--dot, var(--accent)); }
-  .timeline .ev { display:grid; grid-template-columns:1fr 150px auto; gap:6px; }
+  .timeline .ev { display:grid; grid-template-columns:1fr 150px 130px auto; gap:6px; }
   .timeline textarea { grid-column:1 / -1; min-height:44px; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   label { font-size:12px; color:var(--muted); display:grid; gap:3px; }
