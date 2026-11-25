@@ -9,11 +9,11 @@ module Export
     account_id = DB[:accounts].where(email: email).get(:id) or raise "No account for #{email}."
     # Newest first, like the old app's files. Rows without an old id get a stable one from this database.
     id = ->(row) { row.legacy_id || "web-#{row.id}" }
-    jobs = Application.where(account_id: account_id).order(Sequel.desc(:id)).all.map do |a|
+    jobs = Application.where(account_id: account_id, deleted_at: nil).order(Sequel.desc(:id)).all.map do |a|
       { "id" => id[a], "applied_on" => a.applied_on.to_s, **%w[company title location pay url notes prep].to_h { [_1, a.public_send(_1)] },
         "history" => a.history.map { { "stage" => _1.stage, "on" => _1.on.to_s, "at" => _1.at.to_s, "note" => _1.note } } }
     end
-    refs = Referral.where(account_id: account_id).order(Sequel.desc(:id)).all.map do |r|
+    refs = Referral.where(account_id: account_id, deleted_at: nil).order(Sequel.desc(:id)).all.map do |r|
       { "id" => id[r], "status" => r.status, **Referral::TEXT.to_h { [_1.to_s, r.public_send(_1)] },
         **(Referral::DATES + [:added_on]).to_h { [_1.to_s, r[_1].to_s] } }
     end

@@ -10,8 +10,9 @@ module Api
   class Invalid < StandardError; end
 
   def api_routes(r, account_id)
-    apps = Application.where(account_id: account_id)
-    refs = Referral.where(account_id: account_id)
+    # Live rows only; trashed ones are reachable through /api/trash.
+    apps = Application.where(account_id: account_id, deleted_at: nil)
+    refs = Referral.where(account_id: account_id, deleted_at: nil)
 
     r.get("session") { { email: rodauth.account[:email], csrf: csrf_token } }
     r.get("stages") { STAGES }
@@ -19,14 +20,17 @@ module Api
 
     r.on "jobs" do
       r.is do
-        r.get { apps.order(Sequel.desc(:id)).eager(:events).all.map(&:to_api) }
+        r.get do
+          purge_trash(account_id)
+          apps.order(Sequel.desc(:id)).eager(:events).all.map(&:to_api)
+        end
         r.post { add_job(apps, account_id, r.POST) }
       end
       r.on Integer do |id|
         job = apps.first(id: id) or not_found(r)
         r.is do
           r.patch { update_job(job, r.POST) }
-          r.delete { job.destroy; { ok: true } }
+          r.delete { job.update(deleted_at: Time.now); { ok: true } } # to Trash
         end
         r.on "events" do
           r.is { r.post { job.add_event(event_attrs(r.POST)); job.refresh.to_api } }
@@ -95,6 +99,26 @@ module Api
       end
     end
 
+    # Trash: deleted applications (saved jobs included) and referrals, restorable for TRASH_DAYS.
+    r.on "trash" do
+      trashed = { "jobs" => Application.where(account_id: account_id).exclude(deleted_at: nil),
+                  "referrals" => Referral.where(account_id: account_id).exclude(deleted_at: nil) }
+      r.is do
+        r.get do
+          purge_trash(account_id)
+          { days: TRASH_DAYS,
+            jobs: trashed["jobs"].order(Sequel.desc(:deleted_at)).eager(:events).all.map { _1.to_api.merge(deleted_at: _1.deleted_at.iso8601) },
+            referrals: trashed["referrals"].order(Sequel.desc(:deleted_at)).all.map { _1.to_api.merge(deleted_at: _1.deleted_at.iso8601) } }
+        end
+        r.delete { trashed.each_value(&:delete); { ok: true } } # empty it; timeline steps cascade
+      end
+      r.on %w[jobs referrals], Integer do |kind, id|
+        row = trashed[kind].first(id: id) or not_found(r)
+        r.is("restore") { r.post { row.update(deleted_at: nil).to_api } }
+        r.is { r.delete { row.destroy; { ok: true } } }
+      end
+    end
+
     r.on "referrals" do
       r.is do
         r.get { { statuses: REF_STATUSES, referrals: refs.order(Sequel.desc(:id)).all.map(&:to_api) } }
@@ -107,12 +131,18 @@ module Api
           raise Invalid, "Referrer name is required" if fields.key?(:name) && fields[:name].empty?
           ref.update(fields).to_api
         end
-        r.delete { ref.destroy; { ok: true } }
+        r.delete { ref.update(deleted_at: Time.now); { ok: true } } # to Trash
       end
     end
   end
 
   private
+
+  TRASH_DAYS = 30
+  def purge_trash(account_id)
+    cutoff = Time.now - TRASH_DAYS * 86_400
+    [Application, Referral].each { _1.where(account_id: account_id) { deleted_at < cutoff }.delete }
+  end
 
   def not_found(r) = r.halt([404, { "content-type" => "application/json" }, ['{"error":"Not found"}']])
 
