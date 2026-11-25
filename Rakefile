@@ -91,6 +91,30 @@ task :import do
   puts "Imported into #{ENV.fetch('EMAIL')}: #{Import.run(ENV.fetch('EMAIL'), dir)}"
 end
 
+desc "Write one account's data as jobs.json + referrals.json: rake export EMAIL=you@example.com TO=dir"
+task :export do
+  require_relative "export"
+  dir = File.expand_path(ENV.fetch("TO"))
+  puts "Exported #{ENV.fetch('EMAIL')} to #{dir}: #{Export.run(ENV.fetch('EMAIL'), dir)}"
+end
+
+desc "Create a verified account without email (for closed sign-ups): rake create_account EMAIL=you@example.com"
+task :create_account do
+  require_relative "config"
+  require "bcrypt"
+  require "io/console"
+  email = ENV.fetch("EMAIL")
+  abort "#{email} already has an account." if DB[:accounts].where(email: email, status_id: [1, 2]).any?
+  password = IO.console.getpass("Password (10+ characters): ")
+  abort "Too short." if password.length < 10
+  abort "Passwords don't match." unless IO.console.getpass("Again: ") == password
+  DB.transaction do
+    id = DB[:accounts].insert(email: email, status_id: 2) # 2 = verified
+    DB[:account_password_hashes].insert(id: id, password_hash: BCrypt::Password.create(password))
+  end
+  puts "Created #{email}. Log in with that password."
+end
+
 Rake::TestTask.new { |t| t.pattern = "test/*_test.rb"; t.warning = false }
 task default: :test
 

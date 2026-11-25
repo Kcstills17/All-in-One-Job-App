@@ -8,6 +8,10 @@ Sequel::Model.plugin :column_encryption do |enc|
 end
 
 module Encrypted
+  # Decrypted values come back as binary; everything stored is text, so tag it UTF-8 (the stored
+  # bytes are unchanged). Passed as `format:` on every encrypted column.
+  TEXT = [->(v) { v }, ->(v) { String.new(v, encoding: Encoding::UTF_8) }].freeze
+
   # Encrypted columns have no database default, so a missing value is saved as an encrypted "".
   # (Use the col / col= methods: self[col] holds ciphertext, filled in only as validation runs.)
   def before_validation
@@ -24,8 +28,8 @@ REF_STATUSES = ["To Contact", "Messaged", "Followed Up", "Replied", "Met", "Refe
 class Application < Sequel::Model
   def self.encrypted = %i[company title location pay url notes]
   plugin :column_encryption do |enc|
-    (encrypted - [:url]).each { enc.column _1 }
-    enc.column :url, searchable: true # exact-match lookups find duplicate links
+    (encrypted - [:url]).each { enc.column _1, format: Encrypted::TEXT }
+    enc.column :url, searchable: true, format: Encrypted::TEXT # exact-match lookups find duplicate links
   end
   include Encrypted
   one_to_many :events, class: :ApplicationEvent
@@ -42,7 +46,7 @@ end
 class ApplicationEvent < Sequel::Model
   def self.encrypted = %i[note]
   plugin :column_encryption do |enc|
-    enc.column :note
+    enc.column :note, format: Encrypted::TEXT
   end
   include Encrypted
   many_to_one :application
@@ -55,7 +59,7 @@ class Referral < Sequel::Model
   DATES = %i[first_contact second_contact meeting_on].freeze
   def self.encrypted = TEXT
   plugin :column_encryption do |enc|
-    TEXT.each { enc.column _1 }
+    TEXT.each { enc.column _1, format: Encrypted::TEXT }
   end
   include Encrypted
 
