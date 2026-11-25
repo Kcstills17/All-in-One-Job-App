@@ -70,11 +70,17 @@ task :setup_production do
   puts "Done. Settings for the host are in #{file}. Back up COLUMN_KEY somewhere safe: losing it loses the data."
 end
 
-desc "Run database migrations (app user, then password user)"
-task :migrate do
+# The host runs this before every start (render.yaml), so the schema is always current before the app
+# reads it. It needs only the app's database user; password-table changes still go through `rake migrate`.
+desc "Run the app user's migrations (migrate/)"
+task "migrate:app" do
   require_relative "config"
   Sequel.extension :migration
   Sequel::Migrator.run(DB, "migrate")
+end
+
+desc "Run database migrations (app user, then password user)"
+task migrate: "migrate:app" do
   Sequel.connect(ENV.fetch("PASSWORD_DATABASE_URL")) do |db|
     # The migrator always tries to create its version table, and the password user may only create
     # tables during setup. So skip it unless a migrate_password/ file hasn't run yet.

@@ -6,7 +6,8 @@ services:
     runtime: ruby
     plan: free
     buildCommand: bundle install
-    startCommand: bundle exec puma -b tcp://0.0.0.0:$PORT config.ru
+    # Migrations run first, so a new column never meets a server that already read the old schema.
+    startCommand: bundle exec rake migrate:app && bundle exec puma -b tcp://0.0.0.0:$PORT config.ru
     healthCheckPath: /login
     envVars:
       - key: RACK_ENV

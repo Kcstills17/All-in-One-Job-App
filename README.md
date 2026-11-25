@@ -37,7 +37,7 @@ It runs on [Render](https://render.com)'s free web plan with a free [Neon](https
 2. Locally, run `bundle exec rake setup_production ADMIN_DATABASE_URL='<that string>'`. It creates the database users, runs the migrations, and writes every setting the app needs to a git-ignored `.env.production`. Back up `COLUMN_KEY`: without it the data can't be read.
 3. In Render, create a Blueprint from this repo and paste in the values `render.yaml` asks for.
 
-New schema changes are applied the same way: `RACK_ENV=production bundle exec rake migrate` from your machine. Sign-ups stay closed unless `SIGNUPS_OPEN=true` is set.
+Schema changes in `migrate/` apply themselves: the service runs `rake migrate:app` each time it starts. Changes to the password table (`migrate_password/`) still need `RACK_ENV=production bundle exec rake migrate` from your machine. Sign-ups stay closed unless `SIGNUPS_OPEN=true` is set.
 
 ## Privacy and security
 
