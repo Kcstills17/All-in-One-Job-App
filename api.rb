@@ -64,7 +64,9 @@ module Api
 
   def not_found(r) = r.halt([404, { "content-type" => "application/json" }, ['{"error":"Not found"}']])
 
+  # saved=1 keeps it as a lead ("Saved" stage, no applied date) until you apply.
   def add_job(apps, account_id, params)
+    saved = params["saved"].to_s == "1" || params["saved"] == true
     url = link!(params["url"])
     dup = apps.with_encrypted_value(:url, url).first unless url.empty?
     return dup.to_api.merge(duplicate: true) if dup
@@ -79,9 +81,12 @@ module Api
       pay: text(params["pay"]) || info[:pay].to_s,
       # Keep a posting's location text if it didn't map to the list (e.g. "Eastern Time zone").
       notes: [params["notes"].to_s, (posting_loc_note(info[:location]) if no_location)].compact.reject(&:empty?).join("\n"),
-      applied_on: date!(params["applied_on"]) || Date.today
+      applied_on: saved ? nil : date!(params["applied_on"]) || Date.today
     )
-    DB.transaction { job.save; job.add_event(stage: "Applied", on: job.applied_on, note: "") }
+    DB.transaction do
+      job.save
+      job.add_event(stage: saved ? "Saved" : "Applied", on: saved ? date!(params["on"]) || Date.today : job.applied_on, note: "")
+    end
     job.to_api
   end
 

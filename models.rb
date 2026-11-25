@@ -20,7 +20,7 @@ module Encrypted
   end
 end
 
-STAGES = ["Applied", "Followed Up", "Recruiter Screen", "Hiring Manager", "Technical Interview", "Take-home",
+STAGES = ["Saved", "Applied", "Followed Up", "Recruiter Screen", "Hiring Manager", "Technical Interview", "Take-home",
           "Final Round", "Work Trial", "Offer", "Accepted", "Rejected", "Ghosted", "Withdrawn"].freeze
 REF_STATUSES = ["To Contact", "Messaged", "Followed Up", "Replied", "Met", "Referral Offered", "Referred",
                 "Declined", "No Response"].freeze

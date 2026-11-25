@@ -73,6 +73,15 @@ class ApiTest < Minitest::Test
     assert_empty api("GET", "/api/jobs")[1]
   end
 
+  def test_saved_lead_becomes_an_application
+    log_in("me@example.com")
+    _, lead = api("POST", "/api/jobs", { url: "https://boards.example.com/j/7", saved: true })
+    assert_equal [["Saved"], ""], [lead["history"].map { _1["stage"] }, lead["applied_on"]]
+    assert_equal true, api("POST", "/api/jobs", { url: "https://boards.example.com/j/7" })[1]["duplicate"], "applying from the same link finds the lead"
+    _, job = api("PATCH", "/api/jobs/#{lead['id']}", { stage: "Applied", applied_on: "2026-11-25", on: "2026-11-25" })
+    assert_equal [%w[Saved Applied], "2026-11-25"], [job["history"].map { _1["stage"] }, job["applied_on"]]
+  end
+
   def test_validation
     log_in("me@example.com")
     assert_equal 422, api("POST", "/api/jobs", { url: "javascript:alert(1)" }).first
