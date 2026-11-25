@@ -48,7 +48,7 @@ $("#bm").href = `javascript:(()=>{window.open('${location.origin}/add?url='+enco
 async function load() {
   let refData, all;
   [STAGES, all, LOCS, refData] = await Promise.all([api("/api/stages"), api("/api/jobs"), api("/api/locations"),
-    api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true }))]);
+    api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true })), loadPrep()]);
   // Saved leads aren't applications yet: they get their own tab and stay out of every stat and chart.
   STAGES = STAGES.filter(s => s !== "Saved");
   leads = all.filter(isLead); jobs = all.filter(j => !isLead(j));
@@ -62,7 +62,7 @@ async function load() {
 }
 
 // ---- Tabs: only the open view renders (the Sankey can't measure itself while hidden). Linkable: /?view=referrals ----
-const VIEWS = ["applications", "saved", "referrals", "together"];
+const VIEWS = ["applications", "interviews", "saved", "referrals", "together"];
 let view = VIEWS.find(v => v === new URLSearchParams(location.search).get("view")) || "applications";
 function showView() {
   VIEWS.forEach(v => { $(`#view-${v}`).hidden = v !== view; });
@@ -636,7 +636,8 @@ function render() {
   $("#tabApps .count").textContent = jobs.length.toLocaleString();
   $("#tabRefs .count").textContent = referrals.length;
   $("#tabSaved .count").textContent = leads.length || "";
-  ({ applications: renderApplications, saved: renderSaved, referrals: renderReferrals, together: renderTogether })[view]();
+  $("#tabInterviews .count").textContent = upcomingInterviews(jobs, ymd(new Date())).length || "";
+  ({ applications: renderApplications, interviews: renderInterviews, saved: renderSaved, referrals: renderReferrals, together: renderTogether })[view]();
 }
 
 // ---- Saved leads: jobs to apply to later. "Applied" turns one into an application dated today ----
@@ -1091,7 +1092,7 @@ $("#detail").addEventListener("click", async e => {
 const scope = new URLSearchParams(location.search).get("scope"); // e.g. /?scope=interviewed
 if (scope) $("#scope").value = scope;
 showView();
-load();
+addEventListener("DOMContentLoaded", load); // after interviews.js, which load() also needs, has run
 addEventListener("themechange", () => { if (jobs.length) render(); }); // charts read colors when they draw
 
 // Live salary preview in the detail panel (an event listener, since the page allows no inline handlers).
