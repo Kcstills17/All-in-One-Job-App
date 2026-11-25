@@ -56,32 +56,6 @@ class GmailScanTest < Minitest::Test
   end
 end
 
-require_relative "../gmail"
-
-# Reading the text out of a raw email (what Gmail hands over), with no network.
-class GmailTextTest < Minitest::Test
-  RAW = <<~MAIL.gsub("\n", "\r\n")
-    From: "Acme Recruiting" <no-reply@greenhouse.io>
-    Subject: =?UTF-8?Q?Your_application_to_Acme_=E2=80=94_Support?=
-    MIME-Version: 1.0
-    Content-Type: multipart/alternative; boundary="b1"
-
-    --b1
-    Content-Type: text/html; charset=UTF-8
-
-    <html><style>p{color:red}</style><p>Hi Zane,</p><p>Unfortunately we&#39;re moving forward with other candidates.</p></html>
-    --b1--
-  MAIL
-
-  def test_html_only_email_becomes_plain_text
-    assert_equal "Hi Zane, Unfortunately we're moving forward with other candidates.", Gmail.text_of(RAW)
-    assert_equal "Your application to Acme — Support", Gmail.decode("=?UTF-8?Q?Your_application_to_Acme_=E2=80=94_Support?=")
-  end
-
-  def test_a_broken_email_reads_as_empty
-    assert_equal "", Gmail.text_of("\xFF\xFE not an email".b) rescue flunk "raised"
-  end
-end
 
 class GmailSentenceTest < Minitest::Test
   def test_the_sentence_comes_from_the_body_when_it_has_the_phrase

@@ -2,6 +2,8 @@ require_relative "config"
 require_relative "api"
 require_relative "throttle"
 require_relative "bot_guard"
+require_relative "gmail_ingest"
+require "securerandom"
 require "roda"
 require "mail"
 
@@ -128,6 +130,21 @@ class App < Roda
     end
 
     r.public
+
+    # The Gmail script in the user's Google account (apps_script/) posts job emails here with its token
+    # instead of a login, so there's no session or CSRF token. Unknown tokens get nothing.
+    r.post "gmail/ingest" do
+      token = env["HTTP_AUTHORIZATION"].to_s[/\ABearer (\S+)\z/, 1]
+      account_id = token && GmailToken.where(digest: GmailToken.digest(token)).get(:account_id)
+      r.halt([401, { "content-type" => "application/json" }, ['{"error":"Unknown token"}']]) unless account_id
+      emails = r.POST["emails"]
+      r.halt([422, { "content-type" => "application/json" }, ['{"error":"Send {\"emails\": [...]}"}']]) unless emails.is_a?(Array)
+      GmailIngest.run(account_id, emails)
+    rescue ArgumentError => e
+      response.status = 422
+      { error: e.message }
+    end
+
     check_csrf!
     begin
       r.rodauth
@@ -139,6 +156,21 @@ class App < Roda
 
     r.root { File.read(File.join(__dir__, "public/index.html")) }
     r.get("account") { view "home" }
+
+    # Gmail script token: made here and shown once; only its digest is stored. A new one replaces the old.
+    r.post "account/gmail-token" do
+      @gmail_token = SecureRandom.urlsafe_base64(32)
+      DB.transaction do
+        GmailToken.where(account_id: rodauth.session_value).delete
+        GmailToken.create(account_id: rodauth.session_value, digest: GmailToken.digest(@gmail_token))
+      end
+      view "home"
+    end
+    r.post "account/gmail-revoke" do
+      GmailToken.where(account_id: rodauth.session_value).delete
+      flash["notice"] = "Gmail disconnected. The script's token no longer works."
+      r.redirect "/account"
+    end
 
     # Bookmarklet popup: opening it only shows a pre-filled form; Save is a POST with a CSRF token,
     # so another site can open this page but can't log anything into the account.

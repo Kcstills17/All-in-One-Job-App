@@ -108,3 +108,26 @@ class Resume < Sequel::Model
 
   def to_api = { id: id.to_s, name:, url:, notes:, started_on: started_on.to_s }
 end
+
+# Gmail scan. Only the token's digest is kept; the token itself is shown once.
+class GmailToken < Sequel::Model
+  unrestrict_primary_key
+  def self.digest(token) = OpenSSL::Digest::SHA256.hexdigest(token.to_s)
+end
+
+# One suggestion from one email, waiting for review. The email body is never stored.
+class EmailMatch < Sequel::Model
+  def self.encrypted = %i[msg_key sender subject sentence]
+  plugin :column_encryption do |enc|
+    enc.column :msg_key, searchable: true, format: Encrypted::TEXT
+    %i[sender subject sentence].each { enc.column _1, format: Encrypted::TEXT }
+  end
+  include Encrypted
+  many_to_one :application
+
+  def gmail_url = "https://mail.google.com/mail/u/0/#all/#{msg_key}"
+  def to_api
+    { id: id.to_s, category:, status:, email_on: email_on.to_s, sender:, subject:, sentence:, gmail_url:,
+      application_id: application_id&.to_s, candidates: candidates.to_s.split(",") }
+  end
+end
