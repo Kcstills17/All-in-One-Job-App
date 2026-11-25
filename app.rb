@@ -82,6 +82,10 @@ class App < Roda
       honeypot + check
     end
     before_create_account_route do
+      unless Signups.open?
+        set_redirect_error_flash "Sign-ups are closed for now."
+        redirect login_path
+      end
       next unless request.post?
       unless param("website").empty? # a bot filled the invisible field: act as if it worked, create nothing
         set_notice_flash verify_account_email_sent_notice_flash
