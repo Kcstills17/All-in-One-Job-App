@@ -35,8 +35,10 @@ class Throttle
   def call(env)
     rule = [env["REQUEST_METHOD"], env["PATH_INFO"]]
     return @app.call(env) unless RULES.key?(rule)
-    # Behind Fly.io the client's address is in Fly-Client-IP; locally it's the socket address.
-    ip = (ENV["RACK_ENV"] == "production" && env["HTTP_FLY_CLIENT_IP"]) || env["REMOTE_ADDR"]
+    # Behind a host's proxy the socket address is the proxy's, so CLIENT_IP_HEADER names the header the
+    # host sets to the real client (Render: True-Client-IP; Fly.io: Fly-Client-IP). Locally it's unset.
+    header = ENV["CLIENT_IP_HEADER"]
+    ip = (header && env["HTTP_#{header.upcase.tr('-', '_')}"]) || env["REMOTE_ADDR"]
     return @app.call(env) if self.class.allow?(rule, ip)
     [429, { "content-type" => "text/plain", "retry-after" => RULES[rule][1].to_s }, ["Too many requests. Try again later.\n"]]
   end
