@@ -14,7 +14,7 @@ class PageTest < Minitest::Test
   end
 
   def test_assets_are_served_with_a_strict_policy
-    %w[/app.js /followups.js /calendar.js /app.css /vendor/d3.min.js /vendor/d3-sankey.min.js].each do |path|
+    %w[/app.js /followups.js /calendar.js /interviews.js /app.css /vendor/d3.min.js /vendor/d3-sankey.min.js].each do |path|
       get path
       assert_equal 200, last_response.status, path
     end
@@ -28,7 +28,7 @@ class PageTest < Minitest::Test
   def test_page_has_no_inline_scripts_or_handlers
     html = File.read(File.join(PUBLIC, "index.html"))
     assert_empty html.scan(/<script(?![^>]*\bsrc=)[^>]*>/), "inline <script>"
-    files = [html, File.read(File.join(PUBLIC, "app.js"))]
+    files = [html, *%w[app.js interviews.js].map { File.read(File.join(PUBLIC, _1)) }]
     assert_empty files.flat_map { _1.scan(/<[a-z][^>]*\son[a-z]+=/i) }, "inline on*= handler"
     assert_empty html.scan(%r{src="https?://}), "script from another site"
   end

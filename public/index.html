@@ -31,6 +31,7 @@
   <h1 class="brand"><span class="mark" aria-hidden="true">J</span><span class="label">Job Tracker</span></h1>
   <nav id="tabs" aria-label="Sections">
     <button type="button" data-view="applications" id="tabApps"><svg class="ic" aria-hidden="true"><use href="#i-briefcase"/></svg><span class="label">Applications</span><span class="count"></span></button>
+    <button type="button" data-view="interviews" id="tabInterviews"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg><span class="label">Interviews</span><span class="count"></span></button>
     <button type="button" data-view="saved" id="tabSaved"><svg class="ic" aria-hidden="true"><use href="#i-bookmark"/></svg><span class="label">Saved</span><span class="count"></span></button>
     <button type="button" data-view="referrals" id="tabRefs"><svg class="ic" aria-hidden="true"><use href="#i-referral"/></svg><span class="label">Referrals</span><span class="count"></span></button>
     <button type="button" data-view="together"><svg class="ic" aria-hidden="true"><use href="#i-together"/></svg><span class="label">Together</span><span class="count"></span></button>
@@ -223,6 +224,26 @@
     </section>
   </div>
 
+  <div class="view" id="view-interviews" hidden>
+  <div class="iv-layout">
+    <section class="card" id="ivLists">
+      <h2 style="margin-bottom:8px"><span class="tile" aria-hidden="true"><svg class="ic"><use href="#i-calendar"/></svg></span>Interviews</h2>
+      <h3>Upcoming</h3><ul class="iv-list" id="ivUp"></ul>
+      <h3 id="ivPastHead">Past</h3><ul class="iv-list" id="ivPast"></ul>
+    </section>
+    <section class="card" id="ivWork"></section>
+  </div>
+  <section class="card" id="prepLib">
+    <h2 style="margin-bottom:4px"><span class="tile" aria-hidden="true"><svg class="ic"><use href="#i-bookmark"/></svg></span>Prep library</h2>
+    <p class="sub" style="margin:0 0 10px">Notes for every interview: STAR stories, answers to common questions, questions to ask.</p>
+    <div id="prepList"></div>
+    <form id="prepAdd" class="row" style="margin-top:10px">
+      <input name="title" placeholder="Title, e.g. STAR: freight outage" required aria-label="Prep note title" style="flex:1 1 260px">
+      <button>Add note</button>
+    </form>
+  </section>
+  </div>
+
   <div class="view" id="view-saved" hidden>
   <section class="card">
     <div class="row spread" style="margin-bottom:4px">
@@ -292,5 +313,6 @@
 <script src="/followups.js"></script>
 <script src="/calendar.js"></script>
 <script src="/app.js"></script>
+<script src="/interviews.js"></script>
 </body>
 </html>
