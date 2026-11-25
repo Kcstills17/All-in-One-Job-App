@@ -82,6 +82,19 @@ class ApiTest < Minitest::Test
     assert_equal [%w[Saved Applied], "2026-11-25"], [job["history"].map { _1["stage"] }, job["applied_on"]]
   end
 
+  def test_interview_time_on_a_step
+    log_in("me@example.com")
+    _, job = api("POST", "/api/jobs", { company: "Acme" })
+    _, job = api("POST", "/api/jobs/#{job['id']}/events", { stage: "Technical Interview", on: "2026-12-02", at: "14:30" })
+    step = job["history"].last
+    assert_equal ["Technical Interview", "2026-12-02", "14:30"], step.values_at("stage", "on", "at")
+    _, job = api("PATCH", "/api/jobs/#{job['id']}/events/1", { note: "with Sam" })
+    assert_equal ["14:30", "with Sam"], job["history"].last.values_at("at", "note"), "editing the note keeps the time"
+    _, job = api("PATCH", "/api/jobs/#{job['id']}/events/1", { at: "" })
+    assert_equal "", job["history"].last["at"]
+    assert_equal 422, api("PATCH", "/api/jobs/#{job['id']}/events/1", { at: "2pm" }).first
+  end
+
   def test_validation
     log_in("me@example.com")
     assert_equal 422, api("POST", "/api/jobs", { url: "javascript:alert(1)" }).first

@@ -51,7 +51,7 @@ class ApplicationEvent < Sequel::Model
   include Encrypted
   many_to_one :application
 
-  def to_api = { stage:, on: on.to_s, note: }
+  def to_api = { stage:, on: on.to_s, at: at.to_s, note: }
 end
 
 class Referral < Sequel::Model
