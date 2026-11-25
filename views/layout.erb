@@ -37,7 +37,7 @@
   <% if flash["error"] %><p class="flash error" role="alert"><%= flash["error"] %></p><% end %>
   <div class="card"><%== yield %></div>
   <% unless rodauth.logged_in? %>
-    <p class="nav"><a href="<%= rodauth.login_path %>">Log in</a><a href="<%= rodauth.create_account_path %>">Create account</a></p>
+    <p class="nav"><a href="<%= rodauth.login_path %>">Log in</a><% if Signups.open? %><a href="<%= rodauth.create_account_path %>">Create account</a><% end %></p>
   <% end %>
 </main>
 </body>
