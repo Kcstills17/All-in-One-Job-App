@@ -26,7 +26,7 @@ REF_STATUSES = ["To Contact", "Messaged", "Followed Up", "Replied", "Met", "Refe
                 "Declined", "No Response"].freeze
 
 class Application < Sequel::Model
-  def self.encrypted = %i[company title location pay url notes]
+  def self.encrypted = %i[company title location pay url notes prep]
   plugin :column_encryption do |enc|
     (encrypted - [:url]).each { enc.column _1, format: Encrypted::TEXT }
     enc.column :url, searchable: true, format: Encrypted::TEXT # exact-match lookups find duplicate links
@@ -38,20 +38,21 @@ class Application < Sequel::Model
   def history = events.sort_by { [_1.on.to_s, STAGES.index(_1.stage), _1.id] }
 
   def to_api
-    { id: id.to_s, company:, title:, location:, pay:, url:, notes:, applied_on: applied_on.to_s,
+    { id: id.to_s, company:, title:, location:, pay:, url:, notes:, prep: prep.to_s, applied_on: applied_on.to_s,
       history: history.map(&:to_api) }
   end
 end
 
 class ApplicationEvent < Sequel::Model
-  def self.encrypted = %i[note]
+  def self.encrypted = %i[note checked]
   plugin :column_encryption do |enc|
-    enc.column :note, format: Encrypted::TEXT
+    encrypted.each { enc.column _1, format: Encrypted::TEXT }
   end
   include Encrypted
   many_to_one :application
 
-  def to_api = { stage:, on: on.to_s, at: at.to_s, note: }
+  # checked: the day-of checklist items ticked for this step, one per line.
+  def to_api = { stage:, on: on.to_s, at: at.to_s, note:, checked: checked.to_s.split("\n") }
 end
 
 class Referral < Sequel::Model
@@ -67,4 +68,32 @@ class Referral < Sequel::Model
     { id: id.to_s, status:, added_on: added_on.to_s, **TEXT.to_h { [_1, public_send(_1)] },
       **DATES.to_h { [_1, self[_1].to_s] } }
   end
+end
+
+# Notes about a company, shared by every application to it. `key` is the lowercased name, searchable
+# without decrypting, so "Acme" and "acme " find the same notes.
+class Company < Sequel::Model
+  def self.encrypted = %i[key name notes]
+  plugin :column_encryption do |enc|
+    enc.column :key, searchable: true, format: Encrypted::TEXT
+    %i[name notes].each { enc.column _1, format: Encrypted::TEXT }
+  end
+  include Encrypted
+
+  def self.key_for(name) = name.to_s.strip.downcase
+  def to_api = { id: id.to_s, name:, notes: }
+end
+
+# The prep library (kind "note") and the day-of checklist (kind "checklist": one item per line in body).
+class PrepNote < Sequel::Model
+  def self.encrypted = %i[title body]
+  plugin :column_encryption do |enc|
+    encrypted.each { enc.column _1, format: Encrypted::TEXT }
+  end
+  include Encrypted
+
+  DEFAULT_CHECKLIST = ["Tested the video link, camera and mic", "Picked the resume version I sent",
+                       "Reread the posting and my role notes", "Questions ready for them", "Water and a quiet room"].freeze
+
+  def to_api = { id: id.to_s, title:, body: }
 end

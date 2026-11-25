@@ -43,6 +43,45 @@ module Api
       end
     end
 
+    # Company notes, found by name. PUT creates or updates the notes for that name.
+    r.is "companies" do
+      companies = Company.where(account_id: account_id)
+      r.get { companies.all.map(&:to_api) }
+      r.put do
+        name = r.POST["name"].to_s.strip
+        raise Invalid, "Company name is required" if name.empty?
+        company = companies.with_encrypted_value(:key, Company.key_for(name)).first ||
+                  Company.new(account_id: account_id, key: Company.key_for(name))
+        company.set(name: name, notes: r.POST["notes"].to_s).save.to_api
+      end
+    end
+
+    # The prep library and the day-of checklist.
+    r.on "prep" do
+      notes = PrepNote.where(account_id: account_id)
+      r.is do
+        r.get do
+          checklist = notes.first(kind: "checklist")
+          { notes: notes.where(kind: "note").order(:id).all.map(&:to_api),
+            checklist: checklist ? lines(checklist.body) : PrepNote::DEFAULT_CHECKLIST }
+        end
+        r.post { PrepNote.create(account_id: account_id, kind: "note", **prep_fields(r.POST, required: true)).to_api }
+      end
+      r.is "checklist" do
+        r.put do
+          items = lines(r.POST["items"])
+          (notes.first(kind: "checklist") || PrepNote.new(account_id: account_id, kind: "checklist", title: "Day-of checklist"))
+            .set(body: items.join("\n")).save
+          { checklist: items }
+        end
+      end
+      r.is Integer do |id|
+        note = notes.first(id: id, kind: "note") or not_found(r)
+        r.patch { note.update(prep_fields(r.POST)).to_api }
+        r.delete { note.destroy; { ok: true } }
+      end
+    end
+
     r.on "referrals" do
       r.is do
         r.get { { statuses: REF_STATUSES, referrals: refs.order(Sequel.desc(:id)).all.map(&:to_api) } }
@@ -91,7 +130,7 @@ module Api
   end
 
   def update_job(job, params)
-    fields = params.slice(*%w[company title location pay notes url applied_on]).transform_values(&:to_s)
+    fields = params.slice(*%w[company title location pay notes prep url applied_on]).transform_values(&:to_s)
     fields["location"] = location!(fields["location"]) if fields.key?("location")
     fields["url"] = link!(fields["url"]) if fields.key?("url")
     fields["applied_on"] = date!(fields["applied_on"]) if fields.key?("applied_on")
@@ -104,8 +143,12 @@ module Api
 
   def event_attrs(params)
     raise Invalid, "unknown stage #{params['stage']}" unless STAGES.include?(params["stage"])
-    { stage: params["stage"], on: date!(params["on"]) || Date.today, at: time!(params["at"]), note: params["note"].to_s }
+    { stage: params["stage"], on: date!(params["on"]) || Date.today, at: time!(params["at"]), note: params["note"].to_s,
+      checked: lines(params["checked"]).join("\n") }
   end
+
+  # A list of short text items (a JSON array, or one per line), blank ones dropped.
+  def lines(value) = (value.is_a?(Array) ? value : value.to_s.split("\n")).map { _1.to_s.strip }.reject(&:empty?)
 
   # "HH:MM" (24-hour, what <input type="time"> sends) or blank.
   def time!(value)
@@ -150,6 +193,13 @@ module Api
       raise Invalid, "unknown status #{params['status']}" unless REF_STATUSES.include?(params["status"])
       out[:status] = params["status"]
     end
+    out
+  end
+
+  def prep_fields(params, required: false)
+    out = %w[title body].filter_map { |k| [k.to_sym, params[k].to_s] if params.key?(k) }.to_h
+    out[:title] = out[:title].strip if out[:title]
+    raise Invalid, "A prep note needs a title" if (required || out.key?(:title)) && out[:title].to_s.empty?
     out
   end
 
