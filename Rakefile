@@ -121,6 +121,56 @@ task :create_account do
   puts "Created #{email}. Log in with that password."
 end
 
+desc "Try the Gmail scan on your mail without saving anything: rake gmail:preview EMAIL=<tracker login> [GMAIL=<address>] [OUT=file.csv]"
+task "gmail:preview" do
+  require_relative "models"
+  require_relative "gmail"
+  require_relative "gmail_scan"
+  require "io/console"
+  email = ENV.fetch("EMAIL")
+  account_id = DB[:accounts].where(email: email).get(:id) or abort "No account for #{email}"
+  gmail = ENV.fetch("GMAIL", email)
+  apps = Application.where(account_id: account_id, deleted_at: nil).eager(:events).all
+                    .reject { _1.history.last&.stage == "Saved" }
+                    .map { { id: _1.id, company: _1.company, title: _1.title, applied_on: _1.applied_on, stage: _1.history.last&.stage } }
+  since = apps.filter_map { _1[:applied_on] }.min or abort "No applications with a date yet."
+  password = IO.console.getpass("Gmail app password for #{gmail} (not saved): ").delete(" ")
+
+  rows = []
+  counts = Hash.new(0)
+  print "Searching Gmail since #{since}…"
+  Gmail.each_email(gmail, password, since: since) do |e|
+    counts[:fetched] += 1
+    print "." if (counts[:fetched] % 50).zero?
+    c = GmailScan.classify(e) or next(counts[:not_job] += 1)
+    next counts[:confirmation] += 1 if c[:category] == :confirmation
+    m = GmailScan.match(e, apps)
+    counts[:"#{c[:category]}_#{m[:app] ? "matched" : "unmatched"}"] += 1
+    rows << [e[:date], c[:category], m[:app] ? "#{m[:app][:company]} · #{m[:app][:title]}" : "NEEDS A MATCH (#{m[:candidates].size} candidates)",
+             m[:app]&.dig(:stage), m[:confidence], c[:phrase], e[:from_name], e[:subject], c[:sentence]]
+  end
+rescue Net::IMAP::NoResponseError => e
+  abort "\nGmail refused the login (#{e.message.strip}). Check the address and the app password, " \
+        "and that 2-Step Verification is on: https://myaccount.google.com/apppasswords"
+else
+  puts "\n\nFetched #{counts[:fetched]} emails since #{since}"
+  puts "  not about an application: #{counts[:not_job]}, confirmations skipped: #{counts[:confirmation]}"
+  %i[rejected moving_on].each do |cat|
+    puts "  #{cat}: #{counts[:"#{cat}_matched"]} matched, #{counts[:"#{cat}_unmatched"]} need a match"
+  end
+  fresh = rows.select { _1[1] == :rejected && %w[Applied Followed\ Up].include?(_1[3]) }.map { _1[2] }.uniq.size
+  puts "  applications still at Applied/Followed Up that a rejection would close: #{fresh}"
+  puts "\nPhrases that fired:"
+  rows.group_by { _1[5] }.sort_by { -_2.size }.each { |phrase, list| puts format("  %4d  %s", list.size, phrase) }
+  puts "\nLatest 25:"
+  rows.last(25).reverse_each { |r| puts "  #{r[0]}  #{r[1].to_s.ljust(9)}  #{r[2][0, 45].ljust(45)}  #{r[7].to_s[0, 60]}" }
+  if (out = ENV["OUT"])
+    head = %w[date category matched current_stage how phrase from subject sentence]
+    File.write(out, ([head] + rows).map { |r| r.map { |v| s = v.to_s; s.match?(/[",\n]/) ? %("#{s.gsub('"', '""')}") : s }.join(",") }.join("\n") + "\n", perm: 0o600)
+    puts "\nAll #{rows.size} rows written to #{out} (only you can read it; delete it when you're done)."
+  end
+end
+
 Rake::TestTask.new { |t| t.pattern = "test/*_test.rb"; t.warning = false }
 desc "Run the page's JavaScript tests (test/*.test.js) with node"
 task :test_js do
