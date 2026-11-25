@@ -37,6 +37,39 @@ task :setup do
   admin.disconnect
 end
 
+desc "One-time hosted database setup: rake setup_production ADMIN_DATABASE_URL='<owner url from Neon>'"
+task :setup_production do
+  require "sequel"
+  require "uri"
+  file = ".env.production"
+  abort "#{file} already exists. Delete it first to start over (that makes new passwords and keys)." if File.exist?(file)
+  admin_url = ENV.fetch("ADMIN_DATABASE_URL")
+  urls = {}
+  Sequel.connect(admin_url) do |db|
+    [ROLE, "#{ROLE}_password"].each do |r|
+      password = SecureRandom.hex(24)
+      verb = db[:pg_roles].where(rolname: r).empty? ? "CREATE" : "ALTER"
+      db.run "#{verb} ROLE #{r} LOGIN PASSWORD '#{password}'"
+      urls[r] = URI(admin_url).tap { _1.user = r; _1.password = password }.to_s
+    end
+    db.run "CREATE EXTENSION IF NOT EXISTS citext"
+    # Hosted Postgres 15+ already limits CREATE in public to its owner; grant it to the app's users.
+    db.run "GRANT USAGE, CREATE ON SCHEMA public TO #{ROLE}, #{ROLE}_password"
+    # Secrets go to a git-ignored file, never the terminal. Copy each line into the host's settings.
+    File.write(file, <<~ENV, perm: 0o600)
+      RACK_ENV=production
+      DATABASE_URL=#{urls[ROLE]}
+      PASSWORD_DATABASE_URL=#{urls["#{ROLE}_password"]}
+      SESSION_SECRET=#{SecureRandom.hex(64)}
+      HMAC_SECRET=#{SecureRandom.hex(32)}
+      COLUMN_KEY=#{SecureRandom.hex(32)}
+    ENV
+    sh({ "RACK_ENV" => "production" }, "bundle exec rake migrate")
+    db.run "REVOKE CREATE ON SCHEMA public FROM #{ROLE}_password" # only while migrating
+  end
+  puts "Done. Settings for the host are in #{file}. Back up COLUMN_KEY somewhere safe: losing it loses the data."
+end
+
 desc "Run database migrations (app user, then password user)"
 task :migrate do
   require_relative "config"
