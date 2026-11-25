@@ -43,6 +43,19 @@ module Api
       end
     end
 
+    r.on "resumes" do
+      resumes = Resume.where(account_id: account_id)
+      r.is do
+        r.get { resumes.order(:started_on, :id).all.map(&:to_api) }
+        r.post { Resume.create(account_id: account_id, **resume_fields(r.POST, required: true)).to_api }
+      end
+      r.is Integer do |id|
+        resume = resumes.first(id: id) or not_found(r)
+        r.patch { resume.update(resume_fields(r.POST)).to_api }
+        r.delete { resume.destroy; { ok: true } } # its applications go back to "by date"
+      end
+    end
+
     # Company notes, found by name. PUT creates or updates the notes for that name.
     r.is "companies" do
       companies = Company.where(account_id: account_id)
@@ -134,6 +147,12 @@ module Api
     fields["location"] = location!(fields["location"]) if fields.key?("location")
     fields["url"] = link!(fields["url"]) if fields.key?("url")
     fields["applied_on"] = date!(fields["applied_on"]) if fields.key?("applied_on")
+    # "" means "by date"; otherwise it must be one of this account's resumes.
+    if params.key?("resume_id")
+      rid = params["resume_id"].to_s
+      fields["resume_id"] = rid.empty? ? nil :
+        (Resume.where(account_id: job.account_id, id: rid.to_i).get(:id) || raise(Invalid, "Unknown resume version"))
+    end
     DB.transaction do
       job.set_fields(fields, fields.keys).save
       job.add_event(event_attrs(params)) if params["stage"] && params["stage"] != job.history.last&.stage
@@ -193,6 +212,14 @@ module Api
       raise Invalid, "unknown status #{params['status']}" unless REF_STATUSES.include?(params["status"])
       out[:status] = params["status"]
     end
+    out
+  end
+
+  def resume_fields(params, required: false)
+    out = %w[name url notes].filter_map { |k| [k.to_sym, params[k].to_s.strip] if params.key?(k) }.to_h
+    out[:url] = link!(out[:url]) if out.key?(:url)
+    out[:started_on] = date!(params["started_on"]) || Date.today if required || params.key?("started_on")
+    raise Invalid, "A resume version needs a name" if (required || out.key?(:name)) && out[:name].to_s.empty?
     out
   end
 

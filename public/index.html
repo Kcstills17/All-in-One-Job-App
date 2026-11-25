@@ -24,6 +24,7 @@
   <symbol id="i-clock" viewBox="0 0 24 24"><path d="M20.5 12A8.5 8.5 0 1 1 15.5 4.3"/><path d="M12 7.5V12l3 2"/><circle cx="18.8" cy="6.2" r="1"/></symbol>
   <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M17.5 11v9l-5.5-3.5L6.5 20V5.5A1.5 1.5 0 0 1 8 4h6"/><circle cx="17.5" cy="6" r="1.25"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M20 12.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18V7.5A1.5 1.5 0 0 1 5.5 6H15"/><path d="M8 4v4M4 10.5h16"/><path d="M8 14h2M12 14h2"/><circle cx="18.5" cy="6.5" r="1.25"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V10"/><path d="M9 12.5h6M9 16h4"/><circle cx="17.5" cy="5.5" r="1.25"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v6.5M12 14.5V19M5 12h14"/></symbol>
 </svg>
 <div class="shell">
@@ -155,6 +156,23 @@
       </table>
     </div>
     <p class="sub" style="margin:8px 0 0;font-size:12px">Uses each role's salary midpoint. Hourly pay is converted at 2,080 hrs/yr. Click a bar or row to list those roles below.</p>
+  </section>
+
+  <section class="card" id="resumeCard">
+    <h2 style="margin-bottom:4px"><span class="tile" aria-hidden="true"><svg class="ic"><use href="#i-doc"/></svg></span>Resume versions</h2>
+    <p class="sub" style="margin:0 0 10px">Each application uses the version you were sending on its applied date, unless you pick one in its details.</p>
+    <div class="table-wrap" style="max-height:none"><table>
+      <thead><tr><th>Version</th><th>Since</th><th>Sent</th><th>Responses</th><th>Interviews</th><th></th></tr></thead>
+      <tbody id="resumeRows"></tbody></table></div>
+    <form id="resumeForm" class="row" style="margin-top:10px">
+      <input name="name" placeholder="Name, e.g. FDE v3" required aria-label="Version name">
+      <input type="url" name="url" placeholder="Link to the file (optional)" aria-label="Link to the file">
+      <label class="row" style="font-size:13px;color:var(--muted)">Sent from <input type="date" name="started_on" required></label>
+      <input name="notes" placeholder="What changed (optional)" aria-label="What changed" style="flex:1 1 220px">
+      <button id="resumeSave">Add version</button>
+      <button type="button" class="ghost" id="resumeCancel" hidden>Cancel</button>
+    </form>
+    <div class="msg" id="resumeMsg"></div>
   </section>
 
   <section class="card">
@@ -312,6 +330,7 @@
 
 <script src="/followups.js"></script>
 <script src="/calendar.js"></script>
+<script src="/resumes.js"></script>
 <script src="/app.js"></script>
 <script src="/interviews.js"></script>
 </body>

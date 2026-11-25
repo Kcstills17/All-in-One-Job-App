@@ -38,7 +38,7 @@ class Application < Sequel::Model
   def history = events.sort_by { [_1.on.to_s, STAGES.index(_1.stage), _1.id] }
 
   def to_api
-    { id: id.to_s, company:, title:, location:, pay:, url:, notes:, prep: prep.to_s, applied_on: applied_on.to_s,
+    { id: id.to_s, company:, title:, location:, pay:, url:, notes:, prep: prep.to_s, resume_id: resume_id&.to_s, applied_on: applied_on.to_s,
       history: history.map(&:to_api) }
   end
 end
@@ -96,4 +96,15 @@ class PrepNote < Sequel::Model
                        "Reread the posting and my role notes", "Questions ready for them", "Water and a quiet room"].freeze
 
   def to_api = { id: id.to_s, title:, body: }
+end
+
+# A resume version: name, link to the file, notes, and the date you started sending it.
+class Resume < Sequel::Model
+  def self.encrypted = %i[name url notes]
+  plugin :column_encryption do |enc|
+    encrypted.each { enc.column _1, format: Encrypted::TEXT }
+  end
+  include Encrypted
+
+  def to_api = { id: id.to_s, name:, url:, notes:, started_on: started_on.to_s }
 end
