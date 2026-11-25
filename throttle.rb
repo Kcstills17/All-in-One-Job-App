@@ -11,7 +11,8 @@ class Throttle
     ["POST", "/api/jobs"] => [120, 3600], # auto-fill fetches the link
     ["POST", "/api/referrals"] => [120, 3600],
     ["GET", "/add"] => [120, 3600],
-    ["POST", "/add"] => [120, 3600]
+    ["POST", "/add"] => [120, 3600],
+    ["POST", "/gmail/ingest"] => [200, 3600] # the Gmail script sends batches of 100
   }.freeze
 
   @counts = {}
