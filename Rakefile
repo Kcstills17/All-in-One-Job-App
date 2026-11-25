@@ -116,7 +116,15 @@ task :create_account do
 end
 
 Rake::TestTask.new { |t| t.pattern = "test/*_test.rb"; t.warning = false }
-task default: :test
+desc "Run the page's JavaScript tests (test/*.test.js) with node"
+task :test_js do
+  if system("node --version", out: File::NULL, err: File::NULL)
+    sh "node --test test/"
+  else
+    puts "Skipping JavaScript tests: node isn't installed."
+  end
+end
+task default: %i[test test_js]
 
 desc "Check gems against the Ruby security advisory database"
 task :audit do
