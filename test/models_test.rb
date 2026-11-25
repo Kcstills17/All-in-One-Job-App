@@ -23,6 +23,15 @@ class ModelsTest < Minitest::Test
     assert_equal 0, Application.with_encrypted_value(:url, "https://stripe.com/jobs/2").count
   end
 
+  def test_decrypted_text_is_utf8
+    app = Application.create(account_id: @account, company: "Café Ünïcode", url: "https://x.dev/é")
+    app.add_event(stage: "Applied", note: "naïve")
+    app = Application[app.id]
+    assert_equal [Encoding::UTF_8] * 3, [app.company, app.url, app.history.first.note].map(&:encoding)
+    assert_equal "Café Ünïcode", app.company
+    assert_equal 1, Application.with_encrypted_value(:url, "https://x.dev/é").count
+  end
+
   def test_referral_round_trip
     ref = Referral.create(account_id: @account, name: "Kana", notes: "coffee chat")
     refute_equal "Kana", DB[:referrals].first[:name]
