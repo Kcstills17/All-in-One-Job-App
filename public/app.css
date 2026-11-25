@@ -174,7 +174,7 @@
   #tabs button, .navlink { display:flex; align-items:center; gap:10px; width:100%; min-height:40px; padding:0 10px; border:0; border-radius:8px;
     background:transparent; color:var(--text2); font-weight:500; text-align:left; text-decoration:none; box-shadow:none; }
   #tabs button:hover, .navlink:hover { background:var(--line2); }
-  #tabs button[aria-pressed="true"] { background:var(--accent-weak); color:var(--accent); font-weight:600; }
+  #tabs button[aria-pressed="true"], .navlink[aria-current="page"] { background:var(--accent-weak); color:var(--accent); font-weight:600; }
   #tabs .count { margin-left:auto; font-size:12px; font-weight:500; color:var(--muted); }
   .side-foot { margin-top:auto; display:flex; flex-direction:column; gap:12px; }
   .shell > main { flex:1; min-width:0; max-width:1200px; padding:28px 28px 64px; }
@@ -287,6 +287,7 @@
     .brand { display:none; }
     /* Icons only, so every tab, the theme switch and Account fit; the open tab stays highlighted and
        the names stay for screen readers. */
+    .sideTrash { display:none; } /* no room in the phone bar; the Trash links by each list cover it */
     #tabs .label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
     .side { padding:8px 12px; } #tabs button { padding:0 8px; }
   }
