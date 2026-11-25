@@ -12,3 +12,7 @@ end
 require "sequel"
 # Connects as the app's database user, which can check passwords but never read the hashes.
 DB = Sequel.connect(ENV.fetch("DATABASE_URL"))
+# Hosted Postgres (Neon) drops idle connections when it scales to zero, so re-check any connection
+# that sat unused for a minute before handing it out.
+DB.extension :connection_validator
+DB.pool.connection_validation_timeout = 60
