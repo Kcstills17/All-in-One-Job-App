@@ -195,7 +195,7 @@ module Fetcher
   def slug_text(slug) = slug.gsub(/---|--|-/, "---" => " - ", "--" => ", ", "-" => " ").sub(/[,\s]+\z/, "").strip
 
   # Bot checks and error pages ("Security check | Jobright", Cloudflare's "Just a moment...") aren't the job.
-  BOT_PAGE = /\A(security check|just a moment|attention required|access denied|are you a robot|please verify|403 forbidden|404 not found|page not found)\b/i
+  BOT_PAGE = /\A(security check|just a moment|attention required|access denied|are you a robot|please verify)\b|\b(page not found|404 not found|403 forbidden)\b/i
 
   def page_title(url)
     html = get(url)
@@ -215,7 +215,7 @@ module Fetcher
     { title: t, company: URI(url).host.sub(/\Awww\./, ""), fallback: true }
   end
 
-  def pay(text) = text.to_s[PAY]&.sub(/[.,]\z/, "")
+  def pay(text) = text.to_s[PAY]&.strip&.sub(/[.,]\z/, "")
   def titleize(slug) = slug.tr("-_", "  ").split.map(&:capitalize).join(" ")
 
   # Fresh cert store: this Ruby's default one demands CRLs and fails every HTTPS call. Verification stays on.

@@ -31,6 +31,7 @@ class AtsTest < Minitest::Test
         companyResult: { companyName: "Scale AI" } } } } }.to_json}</script>),
     "https://jobright.ai/jobs/search?value=fde" => "<title>Security check | Jobright</title>",
     "https://example.com/jobs/1" => "<title>Just a moment...</title>",
+    "https://example.com/jobs/2" => "<title>Y Combinator | Page not found</title>",
     "https://peregrine.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" =>
       "<title>Software Engineer - Peregrine Team - Career Page</title>"
   }
@@ -82,6 +83,7 @@ class AtsTest < Minitest::Test
   def test_bot_check_pages_fill_nothing
     assert_fills({}, "https://jobright.ai/jobs/search?value=fde")
     assert_fills({}, "https://example.com/jobs/1")
+    assert_fills({}, "https://example.com/jobs/2")
   end
 
   def test_jazzhr_page_title
