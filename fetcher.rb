@@ -194,12 +194,16 @@ module Fetcher
   # Workday slugs: "---" was " - ", "--" was punctuation like ", ", "-" was a space.
   def slug_text(slug) = slug.gsub(/---|--|-/, "---" => " - ", "--" => ", ", "-" => " ").sub(/[,\s]+\z/, "").strip
 
+  # Bot checks and error pages ("Security check | Jobright", Cloudflare's "Just a moment...") aren't the job.
+  BOT_PAGE = /\A(security check|just a moment|attention required|access denied|are you a robot|please verify)\b|\b(page not found|404 not found|403 forbidden)\b/i
+
   def page_title(url)
     html = get(url)
     if (info = json_ld(html)) && !info[:title].empty?
       return info.reject { |_, v| v.to_s.empty? }
     end
     t = CGI.unescapeHTML(html[%r{<title[^>]*>(.*?)</title>}mi, 1].to_s.strip)
+    return {} if t.match?(BOT_PAGE) # leave the fields blank to fill in by hand
     # LinkedIn: "Support Engineer at Acme — Remote | LinkedIn"
     if (m = t.match(/\A(.+?) at (.+?)(?: [—|-] (.+?))? \| LinkedIn/))
       return { title: m[1], company: m[2], location: m[3] }
@@ -211,7 +215,7 @@ module Fetcher
     { title: t, company: URI(url).host.sub(/\Awww\./, ""), fallback: true }
   end
 
-  def pay(text) = text.to_s[PAY]&.sub(/[.,]\z/, "")
+  def pay(text) = text.to_s[PAY]&.strip&.sub(/[.,]\z/, "")
   def titleize(slug) = slug.tr("-_", "  ").split.map(&:capitalize).join(" ")
 
   # Fresh cert store: this Ruby's default one demands CRLs and fails every HTTPS call. Verification stays on.
