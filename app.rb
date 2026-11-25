@@ -163,6 +163,11 @@ class App < Roda
         view "add"
       end
       r.post do
+        if r.params["applied_id"] # "I applied" on a saved lead
+          lead = apps.first(id: r.params["applied_id"].to_i) or raise Api::Invalid, "That saved job wasn't found."
+          @saved = update_job(lead, "stage" => "Applied", "applied_on" => Date.today.to_s)
+          next view("add")
+        end
         job = add_job(apps, account_id, r.params)
         job[:duplicate] ? (@duplicate = job) : (@saved = job)
         view "add"

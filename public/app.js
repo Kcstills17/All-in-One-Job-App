@@ -1,4 +1,4 @@
-let STAGES = [], jobs = [], LOCS = [];
+let STAGES = [], jobs = [], leads = [], LOCS = [];
 const OUTCOMES = new Set(["Offer", "Accepted", "Rejected", "Ghosted", "Withdrawn"]);
 const INTERVIEWS = new Set(["Recruiter Screen", "Hiring Manager", "Technical Interview", "Take-home", "Final Round", "Work Trial", "Offer", "Accepted"]);
 const PENDING = "No response yet";
@@ -6,7 +6,8 @@ const PENDING = "No response yet";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const stageOf = j => j.history[j.history.length - 1].stage;
-const byId = id => jobs.find(j => j.id === id);
+const byId = id => jobs.find(j => j.id === id) || leads.find(j => j.id === id);
+const isLead = j => stageOf(j) === "Saved";
 // Writes carry the CSRF token from /api/session; an expired login goes back to the login page.
 let csrfToken;
 const csrf = () => csrfToken ??= fetch("/api/session").then(r => r.json()).then(s => s.csrf);
@@ -45,9 +46,12 @@ function path(j) {
 $("#bm").href = `javascript:(()=>{window.open('${location.origin}/add?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'_blank','width=460,height=600')})()`;
 
 async function load() {
-  let refData;
-  [STAGES, jobs, LOCS, refData] = await Promise.all([api("/api/stages"), api("/api/jobs"), api("/api/locations"),
+  let refData, all;
+  [STAGES, all, LOCS, refData] = await Promise.all([api("/api/stages"), api("/api/jobs"), api("/api/locations"),
     api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true }))]);
+  // Saved leads aren't applications yet: they get their own tab and stay out of every stat and chart.
+  STAGES = STAGES.filter(s => s !== "Saved");
+  leads = all.filter(isLead); jobs = all.filter(j => !isLead(j));
   ({ statuses: REF_STATUSES, referrals } = refData);
   // The page updates on refresh but the server doesn't, so an out-of-date server looks like missing data.
   $("#loadErr").hidden = !refData.failed;
@@ -58,7 +62,7 @@ async function load() {
 }
 
 // ---- Tabs: only the open view renders (the Sankey can't measure itself while hidden). Linkable: /?view=referrals ----
-const VIEWS = ["applications", "referrals", "together"];
+const VIEWS = ["applications", "saved", "referrals", "together"];
 let view = VIEWS.find(v => v === new URLSearchParams(location.search).get("view")) || "applications";
 function showView() {
   VIEWS.forEach(v => { $(`#view-${v}`).hidden = v !== view; });
@@ -604,21 +608,61 @@ function renderApplications() {
 function render() {
   $("#tabApps .count").textContent = jobs.length.toLocaleString();
   $("#tabRefs .count").textContent = referrals.length;
-  ({ applications: renderApplications, referrals: renderReferrals, together: renderTogether })[view]();
+  $("#tabSaved .count").textContent = leads.length || "";
+  ({ applications: renderApplications, saved: renderSaved, referrals: renderReferrals, together: renderTogether })[view]();
 }
-function replaceJob(job) { jobs[jobs.findIndex(j => j.id === job.id)] = job; render(); }
 
-async function addJob(form) {
+// ---- Saved leads: jobs to apply to later. "Applied" turns one into an application dated today ----
+function renderSaved() {
+  const since = j => j.history[0].on ? daysBetween(j.history[0].on, ymd(new Date())) : null;
+  $("#leadInfo").textContent = leads.length ? `${leads.length} saved` : "";
+  $("#leadList").innerHTML = leads.map(j => { const d = since(j); return `<li data-job="${j.id}">
+    <span class="fu-what"><span class="link open">${esc(j.company) || "(no company)"}</span> · ${esc(j.title) || "—"}
+      ${j.url ? `<a href="${esc(j.url)}" target="_blank" rel="noopener" title="Open posting">↗</a>` : ""}
+      <span class="sub">${[j.location, j.pay, d === null ? "" : d === 0 ? "saved today" : `saved ${ago(d)}`].filter(Boolean).map(esc).join(" · ")}</span></span>
+    <span class="row" style="flex:none;gap:6px"><button type="button" class="leadApplied">Applied</button>
+      <button type="button" class="ghost leadDel" title="Delete" aria-label="Delete ${esc(j.company)}">✕</button></span></li>`; }).join("")
+    || `<li class="sub" style="margin:0">Nothing saved. Use Save for later on the Applications tab or in the bookmarklet window.</li>`;
+}
+$("#leadList").addEventListener("click", async e => {
+  const id = e.target.closest("li")?.dataset.job; if (!id) return;
+  if (e.target.matches(".open")) return openDetail(id);
+  if (e.target.matches(".leadApplied")) {
+    e.target.disabled = true;
+    const today = ymd(new Date());
+    await api(`/api/jobs/${id}`, { method: "PATCH", body: JSON.stringify({ stage: "Applied", applied_on: today, on: today }) });
+    await load();
+  }
+  if (e.target.matches(".leadDel") && confirm("Delete this saved job?")) {
+    await api(`/api/jobs/${id}`, { method: "DELETE" });
+    await load();
+  }
+});
+// A changed job can move between Saved and the applications (e.g. its stage changed in the detail panel).
+function replaceJob(job) {
+  const all = [...jobs, ...leads].map(j => j.id === job.id ? job : j).sort((a, b) => b.id - a.id);
+  leads = all.filter(isLead); jobs = all.filter(j => !isLead(j));
+  render();
+}
+
+async function addJob(form, saved = false) {
   const data = Object.fromEntries(new FormData(form));
   if (!data.url && !data.company) { $("#msg").textContent = "Add a link or at least a company name."; return; }
   $("#msg").textContent = "Fetching job details…";
-  const job = await api("/api/jobs", { method: "POST", body: JSON.stringify(data) });
-  $("#msg").textContent = job.error ? `Error: ${job.error}` : `${job.duplicate ? "Already logged" : "Logged"}: ${job.company} — ${job.title}`;
+  let job = await api("/api/jobs", { method: "POST", body: JSON.stringify({ ...data, saved }) });
+  let verb = job.duplicate ? (isLead(job) ? "Already saved" : "Already logged") : saved ? "Saved for later" : "Logged";
+  // Logging a job you'd saved: that lead is the application now.
+  if (job.duplicate && isLead(job) && !saved) {
+    const today = ymd(new Date());
+    job = await api(`/api/jobs/${job.id}`, { method: "PATCH", body: JSON.stringify({ stage: "Applied", applied_on: today, on: today }) });
+    verb = "Moved from Saved and logged";
+  }
+  $("#msg").textContent = job.error ? `Error: ${job.error}` : `${verb}: ${job.company} — ${job.title}`;
   if (job.error) return;
   form.reset(); await load();
   // Heads-up when you've applied to this company before.
   const prior = jobs.filter(j => j.id !== job.id && job.company && lc0(j.company).trim() === lc0(job.company).trim());
-  if (prior.length && !job.duplicate) {
+  if (prior.length && !job.duplicate && !saved) {
     const last = prior.sort((a, b) => (b.applied_on || "").localeCompare(a.applied_on || ""))[0];
     $("#msg").insertAdjacentHTML("beforeend", ` · <span class="link" id="seePrior">You've applied to ${esc(job.company)} ${prior.length}× before</span>
       (latest ${esc(last.applied_on)}: ${esc(last.title)}, ${esc(stageOf(last))})`);
@@ -626,6 +670,7 @@ async function addJob(form) {
   }
 }
 $("#add").addEventListener("submit", e => { e.preventDefault(); addJob(e.target); });
+$("#saveLead").addEventListener("click", () => { const f = $("#add"); if (f.reportValidity()) addJob(f, true); });
 $("#openlog").addEventListener("click", () => { const f = $("#add"); if (!f.reportValidity()) return; if (f.url.value) window.open(f.url.value, "_blank"); addJob(f); });
 
 // ---- City grouping: derived from each job's location text (no separate field) ----

@@ -63,6 +63,29 @@ class BookmarkletTest < Minitest::Test
     assert_includes last_response.body, "Already logged"
   end
 
+  def test_save_for_later_then_mark_applied
+    log_in
+    open_popup
+    post "/add", "url" => URL, "company" => "Acme", "saved" => "1", "_csrf" => form_token
+    assert_includes last_response.body, "Saved for later"
+    assert_equal [[["Saved"], nil]], Application.all.map { [_1.history.map(&:stage), _1.applied_on] }
+    open_popup
+    assert_includes last_response.body, "Saved earlier"
+    post "/add", "applied_id" => Application.first.id, "_csrf" => form_token
+    assert_includes last_response.body, "Logged"
+    assert_equal [%w[Saved Applied]], Application.all.map { _1.history.map(&:stage) }
+  end
+
+  def test_applied_only_touches_your_own_jobs
+    other = DB[:accounts].insert(email: "other@example.com", status_id: 2)
+    theirs = Application.create(account_id: other, company: "Theirs").tap { _1.add_event(stage: "Saved", note: "") }
+    log_in
+    open_popup
+    post "/add", "applied_id" => theirs.id, "_csrf" => form_token
+    assert_includes last_response.body, "wasn&#39;t found"
+    assert_equal [["Saved"], 1], [theirs.refresh.history.map(&:stage), Application.count]
+  end
+
   def test_bad_links_and_locations_show_an_error
     log_in
     get "/add", "url" => "javascript:alert(1)"
