@@ -1,0 +1,37 @@
+# Render Blueprint: the free web service. Values marked sync: false are secrets you paste into the
+# Render dashboard (they come from .env.production, made by `rake setup_production`).
+services:
+  - type: web
+    name: job-tracker
+    runtime: ruby
+    plan: free
+    buildCommand: bundle install
+    startCommand: bundle exec puma -b tcp://0.0.0.0:$PORT config.ru
+    healthCheckPath: /login
+    envVars:
+      - key: RACK_ENV
+        value: production
+      - key: BUNDLE_WITHOUT
+        value: development:test
+      - key: CLIENT_IP_HEADER
+        value: True-Client-IP
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: APP_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: HMAC_SECRET
+        sync: false
+      - key: COLUMN_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false

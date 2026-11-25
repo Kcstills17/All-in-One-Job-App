@@ -29,6 +29,16 @@ bundle exec rake import EMAIL=you@example.com FROM=~/Desktop/Zanes/job-tracker
 
 The import only reads the old files. Running it again syncs the account: edited entries update and new ones get added. Anything deleted in the old app has to be deleted here too. If any count doesn't match, nothing is saved.
 
+## Hosting
+
+It runs on [Render](https://render.com)'s free web plan with a free [Neon](https://neon.com) Postgres database. `render.yaml` describes the service.
+
+1. In Neon, create a project and copy its connection string (the owner's).
+2. Locally, run `bundle exec rake setup_production ADMIN_DATABASE_URL='<that string>'`. It creates the database users, runs the migrations, and writes every setting the app needs to a git-ignored `.env.production`. Back up `COLUMN_KEY`: without it the data can't be read.
+3. In Render, create a Blueprint from this repo and paste in the values `render.yaml` asks for.
+
+New schema changes are applied the same way: `RACK_ENV=production bundle exec rake migrate` from your machine. Sign-ups stay closed unless `SIGNUPS_OPEN=true` is set.
+
 ## Privacy and security
 
 - **Your data is encrypted.** Everything you type is encrypted before it's stored, so it can't be read straight out of the database. That covers companies, roles, links, notes and referral contacts.
