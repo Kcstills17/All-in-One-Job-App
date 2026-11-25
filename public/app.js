@@ -601,8 +601,35 @@ $("#followups").addEventListener("click", async e => {
   }
 });
 
+// ---- Upcoming interviews (logic in calendar.js) ----
+let upcoming = [];
+const whenText = (on, at) => {
+  const d = new Date(`${on}T${at || "12:00"}`);
+  const day = on === ymd(new Date()) ? "Today" : on === ymd(addDays(new Date(), 1)) ? "Tomorrow"
+    : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return at ? `${day}, ${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : day;
+};
+function renderUpcoming() {
+  upcoming = upcomingInterviews(jobs, ymd(new Date()));
+  $("#upcoming").hidden = !upcoming.length;
+  $("#upList").innerHTML = upcoming.map(({ job: j, step: s }, k) => `<li data-job="${j.id}" data-k="${k}">
+    <span class="fu-what"><b>${esc(whenText(s.on, s.at))}</b> · ${esc(s.stage)}
+      <span class="sub"><span class="link open">${esc(j.company) || "(no company)"}</span>${j.title ? ` · ${esc(j.title)}` : ""}${s.note ? ` · ${esc(s.note.split("\n")[0].slice(0, 80))}` : ""}</span></span>
+    <button type="button" class="ghost upIcs" title="Download a calendar file for Apple, Google or Outlook Calendar">Add to calendar</button></li>`).join("");
+}
+$("#upcoming").addEventListener("click", e => {
+  const li = e.target.closest("li"); if (!li) return;
+  if (e.target.matches(".open")) return openDetail(li.dataset.job);
+  if (!e.target.matches(".upIcs")) return;
+  const { job, step, i } = upcoming[li.dataset.k];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([icsFor(job, step, i)], { type: "text/calendar" }));
+  a.download = `${(job.company || "interview").replace(/[^\w-]+/g, "-")}-${step.on}.ics`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
 function renderApplications() {
-  renderFollowUps(); renderGoals(); renderCities(); renderStats(); renderChart(); renderSalary(); renderTable();
+  renderUpcoming(); renderFollowUps(); renderGoals(); renderCities(); renderStats(); renderChart(); renderSalary(); renderTable();
   $("#pipeTitle").textContent = cityPick() ? `Pipeline · ${cityPick()}` : "Pipeline";
 }
 function render() {
@@ -1026,6 +1053,7 @@ function openDetail(id) {
       <li style="--dot:${color(h.stage)}"><form class="ev" data-act="event" data-i="${i}">
         <select name="stage">${options(h.stage)}</select>
         <input type="date" name="on" value="${esc(h.on)}">
+        <input type="time" name="at" value="${esc(h.at)}" aria-label="Time (optional)" title="Time (optional, for interviews)">
         <span class="row"><button>Save</button><button type="button" class="ghost" data-act="delev" data-i="${i}">✕</button></span>
         <textarea name="note" placeholder="What happened? Who did you talk to, what did they ask, next steps…">${esc(h.note)}</textarea>
       </form></li>`).join("")}
@@ -1033,7 +1061,8 @@ function openDetail(id) {
     <h2>Add a step</h2>
     <form class="timeline ev" data-act="addev" style="border:none;padding:0">
       <select name="stage">${options(nextStage(j))}</select>
-      <input type="date" name="on" value="${new Date().toISOString().slice(0, 10)}">
+      <input type="date" name="on" value="${ymd(new Date())}">
+      <input type="time" name="at" aria-label="Time (optional)" title="Time (optional, for interviews)">
       <button>Add</button>
       <textarea name="note" placeholder="Notes for this step"></textarea>
     </form>`;
