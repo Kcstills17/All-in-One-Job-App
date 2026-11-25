@@ -29,6 +29,8 @@ class AtsTest < Minitest::Test
       %(<script id="__NEXT_DATA__" type="application/json">#{{ props: { pageProps: { dataSource: {
         jobResult: { jobTitle: "Forward Deployed Engineer, GenAI", jobLocation: "NYC Metro Area", isRemote: false, salaryDesc: "$179K/yr - $224K/yr" },
         companyResult: { companyName: "Scale AI" } } } } }.to_json}</script>),
+    "https://jobright.ai/jobs/search?value=fde" => "<title>Security check | Jobright</title>",
+    "https://example.com/jobs/1" => "<title>Just a moment...</title>",
     "https://peregrine.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" =>
       "<title>Software Engineer - Peregrine Team - Career Page</title>"
   }
@@ -75,6 +77,11 @@ class AtsTest < Minitest::Test
   def test_jobright
     assert_fills({ company: "Scale AI", title: "Forward Deployed Engineer, GenAI", location: "NYC Metro Area", pay: "$179K/yr - $224K/yr" },
                  "https://jobright.ai/jobs/info/6908e6a0bcccf20de59d48ca?utm_source=share")
+  end
+
+  def test_bot_check_pages_fill_nothing
+    assert_fills({}, "https://jobright.ai/jobs/search?value=fde")
+    assert_fills({}, "https://example.com/jobs/1")
   end
 
   def test_jazzhr_page_title

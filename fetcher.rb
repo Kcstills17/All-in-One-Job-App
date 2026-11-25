@@ -194,12 +194,16 @@ module Fetcher
   # Workday slugs: "---" was " - ", "--" was punctuation like ", ", "-" was a space.
   def slug_text(slug) = slug.gsub(/---|--|-/, "---" => " - ", "--" => ", ", "-" => " ").sub(/[,\s]+\z/, "").strip
 
+  # Bot checks and error pages ("Security check | Jobright", Cloudflare's "Just a moment...") aren't the job.
+  BOT_PAGE = /\A(security check|just a moment|attention required|access denied|are you a robot|please verify|403 forbidden|404 not found|page not found)\b/i
+
   def page_title(url)
     html = get(url)
     if (info = json_ld(html)) && !info[:title].empty?
       return info.reject { |_, v| v.to_s.empty? }
     end
     t = CGI.unescapeHTML(html[%r{<title[^>]*>(.*?)</title>}mi, 1].to_s.strip)
+    return {} if t.match?(BOT_PAGE) # leave the fields blank to fill in by hand
     # LinkedIn: "Support Engineer at Acme — Remote | LinkedIn"
     if (m = t.match(/\A(.+?) at (.+?)(?: [—|-] (.+?))? \| LinkedIn/))
       return { title: m[1], company: m[2], location: m[3] }
