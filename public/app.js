@@ -555,8 +555,50 @@ function checkLoc(input) {
 document.addEventListener("input", e => { if (e.target.matches("input[name=location]")) checkLoc(e.target); });
 document.addEventListener("change", e => { if (e.target.matches("input[name=location]")) { checkLoc(e.target); e.target.reportValidity(); } });
 
+// ---- Due for follow-up (logic in followups.js) ----
+const FU_SHOWN = 8;
+let fuAll = { apps: false, refs: false };
+const ago = d => d === 1 ? "1 day ago" : `${d} days ago`;
+function fuList(id, items, key, row) {
+  const all = fuAll[key], shown = all ? items : items.slice(0, FU_SHOWN);
+  $(id).innerHTML = shown.map(row).join("") + (items.length > FU_SHOWN
+    ? `<li><button type="button" class="ghost fuMore" data-k="${key}">${all ? "Show fewer" : `Show all ${items.length}`}</button></li>` : "")
+    || `<li class="sub" style="margin:0">Nothing due.</li>`;
+}
+function renderFollowUps() {
+  const { apps, refs } = dueFollowUps(jobs, referrals, ymd(new Date()));
+  $("#followups").hidden = !apps.length && !refs.length;
+  $("#fuAppsHead").textContent = `Applications (${apps.length})`;
+  $("#fuRefsHead").textContent = `Referrals (${refs.length})`;
+  fuList("#fuApps", apps, "apps", ({ job: j, days }) => `<li data-job="${j.id}">
+    <span class="fu-what"><span class="link open">${esc(j.company) || "(no company)"}</span> · ${esc(j.title) || "—"}
+      ${j.url ? `<a href="${esc(j.url)}" target="_blank" rel="noopener" title="Open posting">↗</a>` : ""}
+      <span class="sub">${stageOf(j) === "Followed Up" ? "followed up" : "applied"} ${ago(days)}</span></span>
+    <button type="button" class="ghost fuDone">Followed up</button></li>`);
+  fuList("#fuRefs", refs, "refs", ({ ref: r, days }) => {
+    const contact = contactLink(r.contact);
+    return `<li data-ref="${r.id}">
+    <span class="fu-what">${esc(r.name)}${r.company ? ` · ${esc(r.company)}` : ""}
+      ${contact ? `<a href="${esc(contact)}" target="_blank" rel="noopener" title="Contact ${esc(r.name)}">✉</a>` : ""}
+      <span class="sub">${r.status === "Followed Up" ? "followed up" : "messaged"} ${ago(days)}</span></span>
+    <button type="button" class="ghost fuDone">Followed up</button></li>`; });
+}
+$("#followups").addEventListener("click", async e => {
+  if (e.target.matches(".fuMore")) { fuAll[e.target.dataset.k] = !fuAll[e.target.dataset.k]; return renderFollowUps(); }
+  const li = e.target.closest("li");
+  if (e.target.matches(".open")) return openDetail(li.dataset.job);
+  if (!e.target.matches(".fuDone")) return;
+  e.target.disabled = true;
+  const today = ymd(new Date());
+  if (li.dataset.job) {
+    replaceJob(await api(`/api/jobs/${li.dataset.job}/events`, { method: "POST", body: JSON.stringify({ stage: "Followed Up", on: today }) }));
+  } else {
+    replaceReferral(await api(`/api/referrals/${li.dataset.ref}`, { method: "PATCH", body: JSON.stringify({ status: "Followed Up", second_contact: today }) }));
+  }
+});
+
 function renderApplications() {
-  renderGoals(); renderCities(); renderStats(); renderChart(); renderSalary(); renderTable();
+  renderFollowUps(); renderGoals(); renderCities(); renderStats(); renderChart(); renderSalary(); renderTable();
   $("#pipeTitle").textContent = cityPick() ? `Pipeline · ${cityPick()}` : "Pipeline";
 }
 function render() {

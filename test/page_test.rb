@@ -14,7 +14,7 @@ class PageTest < Minitest::Test
   end
 
   def test_assets_are_served_with_a_strict_policy
-    %w[/app.js /app.css /vendor/d3.min.js /vendor/d3-sankey.min.js].each do |path|
+    %w[/app.js /followups.js /app.css /vendor/d3.min.js /vendor/d3-sankey.min.js].each do |path|
       get path
       assert_equal 200, last_response.status, path
     end
