@@ -144,7 +144,7 @@ class App < Roda
     # so another site can open this page but can't log anything into the account.
     r.is "add" do
       account_id = rodauth.session_value
-      apps = Application.where(account_id: account_id)
+      apps = Application.where(account_id: account_id, deleted_at: nil)
       r.get do
         url = r.params["url"].to_s.strip
         @job = { "url" => url }

@@ -62,7 +62,7 @@ async function load() {
 }
 
 // ---- Tabs: only the open view renders (the Sankey can't measure itself while hidden). Linkable: /?view=referrals ----
-const VIEWS = ["applications", "interviews", "saved", "referrals", "together"];
+const VIEWS = ["applications", "interviews", "saved", "referrals", "together", "trash"];
 let view = VIEWS.find(v => v === new URLSearchParams(location.search).get("view")) || "applications";
 function showView() {
   VIEWS.forEach(v => { $(`#view-${v}`).hidden = v !== view; });
@@ -294,9 +294,7 @@ $("#refRows").addEventListener("focusout", e => { if (e.target.matches(".refNote
 $("#refRows").addEventListener("click", async e => {
   const id = e.target.closest("tr")?.dataset.id, ref = referrals.find(r => r.id === id);
   if (e.target.matches(".openRef")) return openReferral(ref);
-  if (!e.target.matches(".delRef") || !confirm(`Delete ${ref.name}${ref.company ? ` at ${ref.company}` : ""}?`)) return;
-  await api(`/api/referrals/${id}`, { method: "DELETE" });
-  referrals = referrals.filter(r => r.id !== id); render();
+  if (e.target.matches(".delRef")) moveToTrash("referrals", id, ref.name);
 });
 function openReferral(r) {
   const d = $("#refDetail");
@@ -682,8 +680,57 @@ function render() {
   $("#tabRefs .count").textContent = referrals.length;
   $("#tabSaved .count").textContent = leads.length || "";
   $("#tabInterviews .count").textContent = upcomingInterviews(jobs, ymd(new Date())).length || "";
-  ({ applications: renderApplications, interviews: renderInterviews, saved: renderSaved, referrals: renderReferrals, together: renderTogether })[view]();
+  ({ applications: renderApplications, interviews: renderInterviews, saved: renderSaved, trash: renderTrash, referrals: renderReferrals, together: renderTogether })[view]();
 }
+
+// ---- Trash: deleting moves things here; restore within the server's TRASH_DAYS ----
+async function moveToTrash(kind, id, label) {
+  const res = await api(`/api/${kind}/${id}`, { method: "DELETE" });
+  if (res.error) return alert(res.error);
+  await load();
+  toast(`Moved ${label} to Trash.`, [["Undo", () => restoreFromTrash(kind, id)], ["View Trash", () => setView("trash")]]);
+}
+async function restoreFromTrash(kind, id) {
+  const res = await api(`/api/trash/${kind}/${id}/restore`, { method: "POST" });
+  if (res.error) return alert(res.error);
+  hideToast(); await load();
+}
+let toastTimer;
+function toast(text, actions = []) {
+  const t = $("#toast"); clearTimeout(toastTimer);
+  t.innerHTML = `<span>${esc(text)}</span>` + actions.map(([label], i) => `<button type="button" class="link" data-i="${i}">${esc(label)}</button>`).join("");
+  t.onclick = e => { const i = e.target.dataset.i; if (i !== undefined) actions[i][1](); };
+  t.hidden = false; toastTimer = setTimeout(hideToast, 8000);
+}
+const hideToast = () => { $("#toast").hidden = true; };
+
+async function renderTrash() {
+  const t = await api("/api/trash");
+  const now = Date.now(), daysAgo = iso => Math.floor((now - Date.parse(iso)) / 864e5);
+  const when = iso => { const d = daysAgo(iso), left = t.days - d;
+    return `deleted ${d ? ago(d) : "today"} · gone ${left <= 1 ? "tomorrow" : `in ${left} days`}`; };
+  const row = (kind, id, what, iso) => `<li data-kind="${kind}" data-id="${id}"><span class="fu-what">${what}<span class="sub">${when(iso)}</span></span>
+    <span class="row" style="flex:none;gap:6px"><button type="button" class="trRestore">Restore</button>
+    <button type="button" class="ghost trForever">Delete forever</button></span></li>`;
+  $("#trashJobs").innerHTML = t.jobs.map(j => row("jobs", j.id, `<b>${esc(j.company) || "(no company)"}</b>${j.title ? ` · ${esc(j.title)}` : ""}${j.history.at(-1).stage === "Saved" ? " <span class=\"pill\">saved job</span>" : ""}`, j.deleted_at)).join("")
+    || `<li class="sub" style="margin:0">Nothing here.</li>`;
+  $("#trashRefs").innerHTML = t.referrals.map(r => row("referrals", r.id, `<b>${esc(r.name)}</b>${r.company ? ` · ${esc(r.company)}` : ""}`, r.deleted_at)).join("")
+    || `<li class="sub" style="margin:0">Nothing here.</li>`;
+  $("#trashDays").textContent = t.days;
+  $("#trashEmpty").disabled = !t.jobs.length && !t.referrals.length;
+}
+$("#view-trash").addEventListener("click", async e => {
+  if (e.target.id === "trashEmpty") {
+    if (!confirm("Delete everything in Trash for good? This can't be undone.")) return;
+    await api("/api/trash", { method: "DELETE" }); return renderTrash();
+  }
+  const li = e.target.closest("li[data-id]"); if (!li) return;
+  if (e.target.matches(".trRestore")) { await restoreFromTrash(li.dataset.kind, li.dataset.id); toast("Restored."); }
+  if (e.target.matches(".trForever") && confirm("Delete this for good? This can't be undone.")) {
+    await api(`/api/trash/${li.dataset.kind}/${li.dataset.id}`, { method: "DELETE" }); renderTrash();
+  }
+});
+document.addEventListener("click", e => { if (e.target.closest(".trashLink")) { e.preventDefault(); setView("trash"); scrollTo(0, 0); } });
 
 // ---- Saved leads: jobs to apply to later. "Applied" turns one into an application dated today ----
 function renderSaved() {
@@ -706,10 +753,7 @@ $("#leadList").addEventListener("click", async e => {
     await api(`/api/jobs/${id}`, { method: "PATCH", body: JSON.stringify({ stage: "Applied", applied_on: today, on: today }) });
     await load();
   }
-  if (e.target.matches(".leadDel") && confirm("Delete this saved job?")) {
-    await api(`/api/jobs/${id}`, { method: "DELETE" });
-    await load();
-  }
+  if (e.target.matches(".leadDel")) moveToTrash("jobs", id, byId(id).company || "the saved job");
 });
 // A changed job can move between Saved and the applications (e.g. its stage changed in the detail panel).
 function replaceJob(job) {
@@ -1070,11 +1114,7 @@ $("#rows").addEventListener("focusout", async e => {
 $("#rows").addEventListener("click", async e => {
   const tr = e.target.closest("tr"); if (!tr) return;
   if (e.target.matches(".open")) return openDetail(tr.dataset.id);
-  if (!e.target.matches(".del")) return;
-  const job = byId(tr.dataset.id);
-  if (!confirm(`Delete ${job.company} — ${job.title}?`)) return;
-  await api(`/api/jobs/${job.id}`, { method: "DELETE" });
-  jobs = jobs.filter(j => j !== job); render();
+  if (e.target.matches(".del")) moveToTrash("jobs", tr.dataset.id, byId(tr.dataset.id).company || "the application");
 });
 
 // ---- Detail panel: job info + editable timeline ----
