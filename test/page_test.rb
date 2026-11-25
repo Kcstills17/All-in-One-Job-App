@@ -24,6 +24,23 @@ class PageTest < Minitest::Test
     refute_match(/script-src[^;]*(unsafe-inline|http)/, policy)
   end
 
+  # Install on phone: the manifest and every icon it names are served without logging in, and the policy allows it.
+  def test_installable
+    get "/manifest.json"
+    assert_equal 200, last_response.status
+    manifest = JSON.parse(last_response.body)
+    assert_equal ["/", "standalone"], manifest.values_at("start_url", "display")
+    (manifest["icons"].map { _1["src"] } + ["/icons/apple-touch-icon.png"]).uniq.each do |src|
+      get src
+      assert_equal [200, "image/png"], [last_response.status, last_response.content_type], src
+    end
+    assert_equal %w[192x192 512x512], manifest["icons"].map { _1["sizes"] }.uniq
+    get "/login"
+    assert_match "manifest-src 'self'", last_response.headers["content-security-policy"]
+    assert_includes last_response.body, %(rel="manifest")
+    assert_includes File.read(File.join(PUBLIC, "index.html")), %(rel="manifest")
+  end
+
   # The policy blocks inline scripts and handlers, so one slipping in would silently break the page.
   def test_page_has_no_inline_scripts_or_handlers
     html = File.read(File.join(PUBLIC, "index.html"))
