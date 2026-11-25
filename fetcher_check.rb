@@ -7,16 +7,16 @@ require_relative "fetcher"
   "https://jobs.ashbyhq.com/talkiatry/4343b2d6-b89f-4534-b208-515963523015" => "Talkiatry",
   "https://jobs.lever.co/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd" => "Palantir",
   "https://www.linkedin.com/jobs/view/4479064983" => "EasyPost",
-  "https://www.ycombinator.com/companies/agave/jobs/U0de7Gn-technical-support-engineer" => "Agave",
+  "https://www.ycombinator.com/companies/tasklet-2/jobs/UcpBWuw-customer-success-engineer" => "Tasklet",
   "https://www.workatastartup.com/jobs/85660" => "Drillbit",
   "https://apply.workable.com/bask-health-1/j/7E3C450C5D/" => "Bask Health",
   "https://ats.rippling.com/empowerly/jobs/bf9b3e41-e94a-409e-8dc6-620f2cc0171b" => "Empowerly",
   "https://jobs.smartrecruiters.com/AECOM2/744000146474898-structural-engineer" => "AECOM",
   "https://jobs.recruitee.com/o/campaign-manager-france" => "Tellent",
   "https://career.teamtailor.com/jobs/8706432-enterprise-account-executive-chicago" => "Teamtailor",
-  "https://jobs.jobvite.com/enphase-energy/job/oz4NAfwK" => "Enphase Energy",
+  "https://jobs.jobvite.com/enphase-energy/job/oKEOAfww" => "Enphase Energy",
   "https://peregrineteam.applytojob.com/apply/ppXpgq8Ykg/Software-Engineer" => "Peregrine Team",
-  "https://jobright.ai/jobs/info/6908e6a0bcccf20de59d48ca" => "Scale AI"
+  "https://jobright.ai/jobs/info/6908e6a0bcccf20de59d48ca" => "Scale"
 }.each do |url, company|
   info = Fetcher.fetch(url)
   ok = info[:company].to_s.include?(company) && !info[:title].to_s.empty?
