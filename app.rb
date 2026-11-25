@@ -39,6 +39,7 @@ class App < Roda
     csp.style_src :self, :unsafe_inline
     csp.font_src :self              # Instrument Sans, served from public/fonts
     csp.img_src :self
+    csp.manifest_src :self          # install on phone (manifest.json)
     csp.form_action :self
     csp.base_uri :none
     csp.frame_ancestors :none
