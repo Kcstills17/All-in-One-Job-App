@@ -27,18 +27,72 @@ const NOISE = new Set(["the", "and", "for", "you", "your", "our", "with", "from"
   "applications", "update", "hiring", "team", "recruiting", "recruiter", "talent", "careers", "career", "jobs", "job", "noreply",
   "reply", "mail", "email", "com", "info", "interest", "regarding", "about", "important", "information", "position", "role",
   "opportunity", "next", "steps", "status", "inc", "llc", "group", "acquisition", "people", "workday", "greenhouse", "lever",
-  "ashbyhq", "ashby", "rippling", "icims", "indeed", "linkedin", "gmail", "support"]);
+  "ashbyhq", "ashby", "rippling", "icims", "indeed", "linkedin", "gmail", "support",
+  // role words: they name the job, not the company
+  "software", "engineer", "engineering", "developer", "junior", "senior", "full", "stack", "fullstack", "backend",
+  "frontend", "technical", "specialist", "associate", "intern", "platform", "data", "systems", "solutions", "services",
+  "analyst", "manager", "customer", "success", "operations", "product", "remote", "hybrid"]);
+// Job sites and mail services: their domain isn't the company.
+const SENDER_HOSTS = /^(myworkday|workday|greenhouse|greenhouse-mail|ashbyhq|rippling|icims|smartrecruiters|workablemail|workable|lever|bamboohr|pinpoint|gem|appreview|hireflix|criteriacorp|successfactors|ultipro|jobvite|breezy|recruitee|teamtailor|indeed|linkedin|gmail|googlemail|outlook|yahoo|hotmail)$/i;
 
 // Likely applications for an unmatched email: the server's candidates, else applications whose company
 // shares a word with the sender's name, address or subject; most recent first.
 function likelyJobs(m) {
   const fromServer = m.candidates.map(id => jobs.find(j => j.id === id)).filter(Boolean);
   if (fromServer.length) return fromServer;
-  const hints = new Set(words(`${m.sender} ${m.subject}`).filter(w => !NOISE.has(w)));
+  const common = commonCompanyWords();
+  const hints = new Set(words(`${m.sender} ${m.subject}`).filter(w => !NOISE.has(w) && !common.has(w)));
   return jobs.filter(j => !appliedAfter(j, m)).map(j => [j, words(j.company).filter(w => hints.has(w)).length])
     .filter(([, n]) => n > 0)
     .sort((a, b) => b[1] - a[1] || (b[0].applied_on || "").localeCompare(a[0].applied_on || ""))
     .slice(0, 6).map(([j]) => j);
+}
+
+// Words in more than three different companies' names ("health", "software", "capital") don't
+// point at any one of them.
+let commonWords;
+function commonCompanyWords() {
+  if (commonWords) return commonWords;
+  const seen = new Map();
+  for (const name of new Set(jobs.map(j => String(j.company || "").trim().toLowerCase())))
+    for (const w of new Set(words(name))) seen.set(w, (seen.get(w) || 0) + 1);
+  return commonWords = new Set([...seen].filter(([, n]) => n > 3).map(([w]) => w));
+}
+
+// For "Add to tracker": a company and role guessed from the email, both editable before saving.
+const titleCase = w => w ? w[0].toUpperCase() + w.slice(1) : "";
+const HIRING_WORDS = /\s*\b(hiring team|recruiting team|talent( acquisition| team)?|recruiting|careers|career opportunities|hr|human resources|people ops)\b.*$/i;
+function guessFromEmail(m) {
+  const [name, address = ""] = String(m.sender).includes(" · ") ? String(m.sender).split(" · ") : ["", String(m.sender)];
+  // Lowercase the lead-in words so "Update From Alkira" reads like "update from Alkira".
+  const LEAD = /\b(applying to|applied to|application to|application with|application at|applying at|interest in|update from|thank you from|thanks from|applying)\b/gi;
+  const subject = String(m.subject).replace(LEAD, w => w.toLowerCase());
+  const ROLE = /\b(engineer|developer|specialist|analyst|manager|associate|intern|representative|technician|designer|scientist|consultant|administrator|coordinator)\b/i;
+  // 1. "Atlas Hiring Team", "NielsenIQ Recruiting": the name before the hiring words.
+  const hiring = HIRING_WORDS.test(name) ? name.replace(HIRING_WORDS, "").replace(/\s+via\s+.*$/i, "").trim() : "";
+  // 2. The subject: "application to Ramp", "Interest in Acrisure", "Higher Logic - Thank you", "Applying DentalXChange".
+  const subjectName = [/\b(?:applying to|applied to|application to|application with|application at|applying at|interest in|update from|thank you from|thanks from|applying)\s+([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,3})/,
+    /^([A-Z][\w&.']*(?:\s+[A-Z][\w&.']*){0,3})\s+[-|:–]\s/, /\bat\s+([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,2})/]
+    .map(re => (subject.match(re) || [])[1])
+    // "Junior Software Engineer - Rokt": the role comes first, so the company is after the dash.
+    .map(c => c && ROLE.test(c) ? ((subject.split(/\s[-|:–]\s/)[1] || "").match(/^[A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,2}/) || [""])[0] : c)
+    .find(c => c && !/^(your|you|the|our|this|thank|thanks|zane)\b/i.test(c)) || "";
+  // "Rokt via Hireflix": the name before "via" is the company.
+  const via = (name.match(/^(.+?)\s+via\s+/i) || [])[1] || "";
+  // 3. A sender name that isn't a person ("Brivo", "StrongMind, Inc.").
+  const person = /^[A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){1,2}$/.test(name.trim());
+  const plainName = !person && !/@|no.?reply|do not reply/i.test(name) ? name.replace(/\s+via\s+.*$/i, "").trim() : "";
+  // 4. The address: the company's own domain (peopleops.geotab.com -> Geotab), or the name before the @ at a job site.
+  const [local, host = ""] = address.toLowerCase().split("@");
+  const labels = host.split("."), site = labels.at(-2) || "";
+  const fromAddress = SENDER_HOSTS.test(site) || SENDER_HOSTS.test(labels[0] || "")
+    ? (/no.?reply|notifications|jobs|careers|talent|recruiting|users|workday|hr|candidates/.test(local) ? "" : local.split(/[+._-]/)[0])
+    : site;
+  const company = hiring || via || subjectName || plainName || (fromAddress && !NOISE.has(fromAddress) ? titleCase(fromAddress) : "");
+  const title = (subject.match(/(?:for|-|–|\|)\s+(?:the\s+)?([A-Z][^|!(]*?(?:Engineer|Developer|Specialist|Analyst|Manager|Associate|Intern|Representative|Technician|Support|Designer|Scientist|Consultant|Administrator|Coordinator))\b/) || [])[1] || "";
+  const lead = subject.split(/\s[-|:–]\s/)[0];
+  const roleFirst = !title && ROLE.test(lead) && lead.length < 60 ? lead.trim() : "";
+  return { company: company.replace(/[,.]+$/, "").trim(), title: (title || roleFirst).replace(new RegExp(`^${company}\\b\\s*`, "i"), "").trim() };
 }
 
 // An email can't be about an application sent after it.
@@ -75,7 +129,8 @@ function inboxItem(m) {
     : `<div class="inPicker"><span class="sub" style="margin:0">Which application? <span class="inChosen"></span></span>
         ${likely.length ? `<span class="inCands"><span class="sub" style="margin:0">Likely:</span>${pickButtons(likely)}</span>` : ""}
         <input type="search" class="inPick" placeholder="Search by company, role or date" aria-label="Search your applications for this email" autocomplete="off">
-        <span class="inCands inResults"></span></div>`;
+        <span class="inCands inResults"></span>
+        ${addForm(m, likely.length)}</div>`;
   return `<li data-id="${m.id}" data-job="${job?.id || ""}">
     <div class="inbox-head"><b>${esc(m.email_on || "")}</b> · ${esc(m.sender)} <a href="${esc(m.gmail_url)}" target="_blank" rel="noopener">Open in Gmail ↗</a></div>
     <div><b>${esc(m.subject)}</b></div>
@@ -112,12 +167,35 @@ $("#view-inbox").addEventListener("click", async e => {
   }
   if (!li) return;
   if (e.target.matches(".inCand")) choose(li, e.target.dataset.id);
+  if (e.target.matches(".inCreate")) {
+    const box = e.target.closest(".inAdd"), data = Object.fromEntries([...box.querySelectorAll("input")].map(i => [i.name, i.value.trim()]));
+    if (!data.company) return alert("Add a company name first.");
+    e.target.disabled = true;
+    const job = await api("/api/jobs", { method: "POST", body: JSON.stringify(data) });
+    e.target.disabled = false;
+    if (job.error) return alert(job.error);
+    jobs.unshift(job); commonWords = null;
+    box.open = false; box.querySelector("summary").textContent = `Added ${jobLabel(job)}`;
+    choose(li, job.id);
+  }
   if (e.target.matches(".inApprove")) {
     if (!li.dataset.job) return alert("Pick the application this email is about first.");
     inboxAct(li, "approve");
   }
   if (e.target.matches(".inDismiss")) inboxAct(li, "dismiss");
 });
+// Not in the tracker yet: make the application from the email, then approve adds the step to it.
+function addForm(m, hasLikely) {
+  const g = guessFromEmail(m);
+  return `<details class="inAdd"${hasLikely ? "" : " open"}><summary>${hasLikely ? "None of these? Add it to your tracker" : "Not in your tracker? Add it"}</summary>
+    <div class="row" style="gap:6px;margin-top:6px">
+      <input name="company" value="${esc(g.company)}" placeholder="Company" aria-label="Company">
+      <input name="title" value="${esc(g.title)}" placeholder="Role (optional)" aria-label="Role">
+      <label class="sub" style="margin:0;display:flex;gap:6px;align-items:center">Applied <input type="date" name="applied_on" value="${esc(m.email_on)}"></label>
+      <button type="button" class="ghost inCreate">Add application</button>
+    </div></details>`;
+}
+
 // Picking an application: remember it, show it, and suggest the stage for that application.
 function choose(li, jobId) {
   const job = jobs.find(j => j.id === jobId);
