@@ -69,6 +69,8 @@
   .inCands { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   .inCands:empty { display:none; }
   .inWarn { color:var(--warn); font-weight:600; }
+  .inAdd summary { cursor:pointer; color:var(--accent); font-size:13px; }
+  .inAdd input[name=company], .inAdd input[name=title] { flex:1 1 180px; }
   .inCand[aria-pressed="true"] { background:var(--accent-weak); color:var(--accent); border-color:var(--accent); }
   /* Interviews tab */
   .iv-layout { display:grid; grid-template-columns:minmax(240px, 320px) 1fr; gap:16px; align-items:start; }
