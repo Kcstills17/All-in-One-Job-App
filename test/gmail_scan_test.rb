@@ -57,6 +57,53 @@ class GmailScanTest < Minitest::Test
 end
 
 
+# Cases taken from a first real scan, where the earlier rules went wrong.
+class GmailRealWorldTest < Minitest::Test
+  def email(subject: "", text: "", from_name: "", from_address: "jobs@example.com", date: Date.new(2026, 10, 1))
+    { subject:, text:, from_name:, from_address:, date: }
+  end
+
+  def cat(**kw) = GmailScan.classify(email(**kw))&.fetch(:category)
+
+  def test_receipts_that_mention_next_steps_are_confirmations
+    assert_equal :confirmation, cat(subject: "Thank you for applying to Steno!", text: "If your profile is a good fit for the role, we'll be in touch shortly about next steps.")
+    assert_equal :confirmation, cat(subject: "Your first step with Auctus", text: "We will send an email with next steps once we review your application.")
+    assert_equal :confirmation, cat(subject: "Zane, your application was sent to Celestron, LLC.", text: "Your application was sent to Celestron. Next steps: people also viewed Snowflake.")
+  end
+
+  def test_clear_invitations_are_moving_on_even_after_a_thank_you
+    assert_equal :moving_on, cat(subject: "Thanks for applying", text: "We'd like to schedule a call with you this week.")
+    assert_equal :moving_on, cat(subject: "Re: Helpt opportunity", text: "As a next step in our hiring process, we'd love for you to complete a short exercise.")
+    assert_equal :moving_on, cat(subject: "Checking your availability for a phone interview", text: "")
+  end
+
+  def test_next_steps_outside_a_job_email_is_ignored
+    assert_nil cat(subject: "Swappa Listing (LALP58577)", text: "*Next steps:* 1. Ship your phone.")
+    assert_nil cat(subject: "Earn rewards and affiliate credit", text: "Useful next steps: short paths, clear wins.")
+  end
+
+  def test_more_rejection_wording
+    assert_equal :rejected, cat(subject: "Counter Sales Associate has been filled.", text: "We regret to inform you that we have filled or closed this position.")
+    assert_equal :rejected, cat(text: "Unfortunately we've reviewed your application and have decided we won't move forward.")
+  end
+
+  APPS = [{ id: 1, company: "Snowflake", title: "Solutions Engineer", applied_on: Date.new(2026, 2, 2) },
+          { id: 2, company: "PoolCorp", title: "Counter Sales Associate", applied_on: Date.new(2026, 9, 1) },
+          { id: 3, company: "RealPage", title: "Help Desk Coordinator", applied_on: Date.new(2026, 9, 1) }].freeze
+
+  def test_company_names_in_the_body_dont_match
+    m = GmailScan.match(email(from_name: "LinkedIn", from_address: "jobs-noreply@linkedin.com", subject: "Your application was sent to Celestron",
+                              text: "People also viewed: Snowflake Solutions Engineer"), APPS)
+    assert_nil m[:app]
+  end
+
+  def test_job_site_senders_match_by_the_name_before_the_at
+    assert_equal 2, GmailScan.match(email(from_address: "poolcorp@myworkday.com", subject: "Position update"), APPS)[:app][:id]
+    assert_equal 3, GmailScan.match(email(from_name: "Do Not Reply", from_address: "realpagepms+email+4e2q@icims.com", subject: "Thank You"), APPS)[:app][:id]
+    assert_nil GmailScan.match(email(from_address: "no-reply@myworkday.com", subject: "Update"), APPS)[:app]
+  end
+end
+
 class GmailSentenceTest < Minitest::Test
   def test_the_sentence_comes_from_the_body_when_it_has_the_phrase
     r = GmailScan.classify({ subject: "Next steps", text: "Hi Zane. Here are the next steps for your interview. Thanks!" })
