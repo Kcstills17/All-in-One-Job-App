@@ -33,6 +33,7 @@
   <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M20 12.5V18a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18V7.5A1.5 1.5 0 0 1 5.5 6H15"/><path d="M8 4v4M4 10.5h16"/><path d="M8 14h2M12 14h2"/><circle cx="18.5" cy="6.5" r="1.25"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V10"/><path d="M9 12.5h6M9 16h4"/><circle cx="17.5" cy="5.5" r="1.25"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7"/><path d="M6.5 7l.8 11.6A1.5 1.5 0 0 0 8.8 20h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 10"/><path d="M10 11v5M14 11v5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M20.5 12v5.5A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 5 5h10"/><path d="M4 6.5l8 6 4.5-3.4"/><circle cx="19" cy="6" r="1.25"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v6.5M12 14.5V19M5 12h14"/></symbol>
 </svg>
 <div class="shell">
@@ -40,6 +41,7 @@
   <h1 class="brand"><span class="mark" aria-hidden="true">J</span><span class="label">Job Tracker</span></h1>
   <nav id="tabs" aria-label="Sections">
     <button type="button" data-view="applications" id="tabApps"><svg class="ic" aria-hidden="true"><use href="#i-briefcase"/></svg><span class="label">Applications</span><span class="count"></span></button>
+    <button type="button" data-view="inbox" id="tabInbox"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span class="label">Inbox</span><span class="count"></span></button>
     <button type="button" data-view="interviews" id="tabInterviews"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg><span class="label">Interviews</span><span class="count"></span></button>
     <button type="button" data-view="saved" id="tabSaved"><svg class="ic" aria-hidden="true"><use href="#i-bookmark"/></svg><span class="label">Saved</span><span class="count"></span></button>
     <button type="button" data-view="referrals" id="tabRefs"><svg class="ic" aria-hidden="true"><use href="#i-referral"/></svg><span class="label">Referrals</span><span class="count"></span></button>
@@ -251,6 +253,16 @@
     </section>
   </div>
 
+  <div class="view" id="view-inbox" hidden>
+  <section class="card">
+    <h2 style="margin-bottom:4px"><span class="tile" aria-hidden="true"><svg class="ic"><use href="#i-mail"/></svg></span>Inbox</h2>
+    <p class="sub" style="margin:0 0 10px">Rejections and next steps found in your Gmail. Approve to add the step to the application, dated from the email. Nothing changes until you do.</p>
+    <p class="sub" id="inboxEmpty">All caught up. New emails show up here after the Gmail script's next hourly check (set it up on the <a href="/account">Account</a> page).</p>
+    <div id="inboxGroups"></div>
+    <datalist id="inboxJobs"></datalist>
+  </section>
+  </div>
+
   <div class="view" id="view-interviews" hidden>
   <div class="iv-layout">
     <section class="card" id="ivLists">
@@ -357,5 +369,6 @@
 <script src="/resumes.js"></script>
 <script src="/app.js"></script>
 <script src="/interviews.js"></script>
+<script src="/inbox.js"></script>
 </body>
 </html>

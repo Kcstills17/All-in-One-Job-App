@@ -48,7 +48,7 @@ $("#bm").href = `javascript:(()=>{window.open('${location.origin}/add?url='+enco
 async function load() {
   let refData, all;
   [STAGES, all, LOCS, refData, resumeList] = await Promise.all([api("/api/stages"), api("/api/jobs"), api("/api/locations"),
-    api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true })), api("/api/resumes"), loadPrep()]);
+    api("/api/referrals").catch(() => ({ statuses: [], referrals: [], failed: true })), api("/api/resumes"), loadPrep(), loadInbox()]);
   // Saved leads aren't applications yet: they get their own tab and stay out of every stat and chart.
   STAGES = STAGES.filter(s => s !== "Saved");
   leads = all.filter(isLead); jobs = all.filter(j => !isLead(j));
@@ -62,7 +62,7 @@ async function load() {
 }
 
 // ---- Tabs: only the open view renders (the Sankey can't measure itself while hidden). Linkable: /?view=referrals ----
-const VIEWS = ["applications", "interviews", "saved", "referrals", "together", "trash"];
+const VIEWS = ["applications", "inbox", "interviews", "saved", "referrals", "together", "trash"];
 let view = VIEWS.find(v => v === new URLSearchParams(location.search).get("view")) || "applications";
 function showView() {
   VIEWS.forEach(v => { $(`#view-${v}`).hidden = v !== view; });
@@ -680,8 +680,9 @@ function render() {
   $("#tabApps .count").textContent = jobs.length.toLocaleString();
   $("#tabRefs .count").textContent = referrals.length;
   $("#tabSaved .count").textContent = leads.length || "";
+  $("#tabInbox .count").textContent = gmailMatches.length || "";
   $("#tabInterviews .count").textContent = upcomingInterviews(jobs, ymd(new Date())).length || "";
-  ({ applications: renderApplications, interviews: renderInterviews, saved: renderSaved, trash: renderTrash, referrals: renderReferrals, together: renderTogether })[view]();
+  ({ applications: renderApplications, inbox: renderInbox, interviews: renderInterviews, saved: renderSaved, trash: renderTrash, referrals: renderReferrals, together: renderTogether })[view]();
 }
 
 // ---- Trash: deleting moves things here; restore within the server's TRASH_DAYS ----
