@@ -1,3 +1,4 @@
+require "cgi"
 require_relative "config"
 
 # Everything a user types is encrypted (AES-256-GCM) before it reaches the database, so someone
@@ -129,9 +130,10 @@ class EmailMatch < Sequel::Model
   many_to_one :application
 
   # With the mailbox, Gmail opens that account even if the browser is signed in to several.
+  # authuser picks the Google account even when the browser is signed in to several.
   def gmail_url(mailbox = nil)
-    who = mailbox.to_s.match?(%r{\A[^\s/#@]+@[^\s/#@]+\z}) ? mailbox : 0
-    "https://mail.google.com/mail/u/#{who}/#all/#{msg_key}"
+    who = mailbox.to_s.match?(%r{\A[^\s/#@?&]+@[^\s/#@?&]+\z}) ? "?authuser=#{CGI.escape(mailbox)}" : "u/0/"
+    "https://mail.google.com/mail/#{who}#all/#{msg_key}"
   end
 
   def to_api(mailbox = nil)

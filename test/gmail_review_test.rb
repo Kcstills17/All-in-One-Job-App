@@ -57,7 +57,7 @@ class GmailReviewTest < Minitest::Test
     log_in("me@example.com")
     _, list = api("GET", "/api/gmail/matches")
     assert_equal 3, list.size
-    assert_equal "https://mail.google.com/mail/u/zanedev28@gmail.com/#all/#{@rej.msg_key}", list.find { _1["id"] == @rej.id.to_s }["gmail_url"]
+    assert_equal "https://mail.google.com/mail/?authuser=zanedev28%40gmail.com#all/#{@rej.msg_key}", list.find { _1["id"] == @rej.id.to_s }["gmail_url"]
 
     _, res = api("POST", "/api/gmail/matches/#{@rej.id}/approve")
     step = res["job"]["history"].last

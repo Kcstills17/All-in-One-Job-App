@@ -57,7 +57,7 @@ class GmailIngestTest < Minitest::Test
     assert_equal ["rejected", "pending", "2026-03-10", "Acme Recruiting · no-reply@greenhouse.io", "Unfortunately, we have decided to move forward with other candidates."],
                  [acme.category, acme.status, acme.email_on.to_s, acme.sender, acme.sentence]
     assert_equal "https://mail.google.com/mail/u/0/#all/m1", acme.gmail_url
-    assert_equal "https://mail.google.com/mail/u/kcstills17@gmail.com/#all/m1", acme.gmail_url("kcstills17@gmail.com")
+    assert_equal "https://mail.google.com/mail/?authuser=kcstills17%40gmail.com#all/m1", acme.gmail_url("kcstills17@gmail.com")
     assert_equal "https://mail.google.com/mail/u/0/#all/m1", acme.gmail_url("not/an address"), "only a plain address goes in the link"
     cribl = EmailMatch.all.find { _1.sender.start_with?("Cribl") }
     assert_equal ["moving_on", nil, 2], [cribl.category, cribl.application_id, cribl.candidates.split(",").size], "two Cribl applications: you pick"
