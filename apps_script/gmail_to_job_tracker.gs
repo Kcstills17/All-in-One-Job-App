@@ -17,6 +17,7 @@ const START = "2026/01/01";                      // the first scan goes back to 
 const QUERY = (ONLY_TO ? `(to:${ONLY_TO} OR deliveredto:${ONLY_TO}) ` : "") + '-category:promotions -category:social -in:sent ' +
   '(subject:(application OR applying OR applied OR interview OR candidacy OR opportunity OR position OR role) ' +
   'OR "other candidates" OR "moving forward" OR "move forward" OR "next steps" OR "your application" OR "regret to inform")';
+const BASE = APP_URL.trim().replace(/\/+$/, ""); // a trailing slash would make "//gmail/ingest", which the tracker refuses
 const PAGE = 50;       // threads per search
 const BATCH = 100;     // emails per request (the tracker's limit)
 const BODY = 20000;    // characters of each email's text to send
@@ -80,17 +81,20 @@ function mailbox() {
 
 // The tracker's free plan sleeps when idle; one request wakes it before the real ones.
 function wake() {
-  try { UrlFetchApp.fetch(APP_URL + "/login", { muteHttpExceptions: true }); } catch (e) { Utilities.sleep(20000); }
+  try { UrlFetchApp.fetch(BASE + "/login", { muteHttpExceptions: true }); } catch (e) { Utilities.sleep(20000); }
 }
 
 function send(emails) {
   const options = { method: "post", contentType: "application/json", muteHttpExceptions: true,
-                    headers: { Authorization: "Bearer " + TOKEN },
+                    headers: { Authorization: "Bearer " + TOKEN }, followRedirects: false,
                     payload: JSON.stringify({ emails, mailbox: mailbox() }) };
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const res = UrlFetchApp.fetch(APP_URL + "/gmail/ingest", options);
-    if (res.getResponseCode() === 200) { console.log(res.getContentText()); return; }
-    if (res.getResponseCode() === 401) throw new Error("The tracker doesn't know this token. Make a new one on the Account page and paste it into TOKEN.");
+    const res = UrlFetchApp.fetch(BASE + "/gmail/ingest", options);
+    const code = res.getResponseCode();
+    if (code === 200) { console.log(res.getContentText()); return; }
+    if (code === 401) throw new Error("The tracker doesn't know this token. Make a new one on the Account page and paste it into TOKEN.");
+    if (code === 403 || code === 404) throw new Error(`The tracker answered ${code}: check APP_URL is your tracker's address, e.g. https://your-app.onrender.com`);
+    console.log(`The tracker answered ${code}; trying again (${attempt} of 3).`);
     Utilities.sleep(15000 * attempt);
   }
   throw new Error("The tracker didn't accept the emails after 3 tries; the next hourly run will try again.");
