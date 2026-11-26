@@ -19,7 +19,7 @@ class GmailReviewTest < Minitest::Test
     @theirs = job(@other, "Theirs", ["Applied"])
     GmailToken.create(account_id: @me, digest: GmailToken.digest("t"), mailbox: "zanedev28@gmail.com")
     @rej = suggestion(@acme, "rejected", "We went with other candidates.")
-    @mov = suggestion(@beta, "moving_on", "Let's schedule a technical interview.")
+    @mov = suggestion(@beta, "moving_on", "We'd like to move you forward to the next round.")
     @loose = suggestion(nil, "rejected", "The role has been filled.", candidates: "#{@acme.id},#{@gone.id}")
   end
 
@@ -88,6 +88,16 @@ class GmailReviewTest < Minitest::Test
     m = suggestion(@gone, "moving_on", "Next round!")
     _, res = api("POST", "/api/gmail/matches/#{m.id}/approve")
     assert_equal "Recruiter Screen", res["job"]["history"].last["stage"]
+  end
+
+  def test_a_named_step_wins_when_it_is_further_along
+    log_in("me@example.com")
+    m = suggestion(@acme, "moving_on", "We'd like to schedule a technical interview.")
+    _, res = api("POST", "/api/gmail/matches/#{m.id}/approve")
+    assert_equal "Technical Interview", res["job"]["history"].last["stage"]
+    m = suggestion(@beta, "moving_on", "Next, a quick phone screen.") # Beta is already past the screen
+    _, res = api("POST", "/api/gmail/matches/#{m.id}/approve")
+    assert_equal "Hiring Manager", res["job"]["history"].last["stage"]
   end
 
   def test_other_accounts_cannot_review_or_target_your_data

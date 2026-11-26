@@ -294,12 +294,19 @@ module Api
   end
 
   # Rejected for rejections; for next steps, the stage after where the application is now.
+  # When the email names the step ("schedule a technical interview"), use it if it's further along.
+  NAMED_STAGES = { /final round|onsite|on-site/i => "Final Round", /work trial|paid trial/i => "Work Trial",
+                   /take[- ]home|coding (challenge|assessment)|online assessment/i => "Take-home",
+                   /technical interview|technical screen|pairing|live coding/i => "Technical Interview",
+                   /hiring manager/i => "Hiring Manager", /phone screen|recruiter (call|screen)|intro call/i => "Recruiter Screen" }.freeze
+
   def suggested_stage(match, job)
     return "Rejected" if match.category == "rejected"
+    named = NAMED_STAGES.find { |re, _| "#{match.subject} #{match.sentence}".match?(re) }&.last
     # Furthest real progress: endings (Rejected, Ghosted, Withdrawn) don't count.
     last = job.history.map(&:stage).reject { %w[Rejected Ghosted Withdrawn].include?(_1) }.max_by { STAGES.index(_1) }
-    return "Recruiter Screen" if [nil, "Saved", "Applied", "Followed Up"].include?(last)
-    STAGES[[STAGES.index(last) + 1, STAGES.index("Accepted")].min]
+    after = [nil, "Saved", "Applied", "Followed Up"].include?(last) ? "Recruiter Screen" : STAGES[[STAGES.index(last) + 1, STAGES.index("Accepted")].min]
+    named && STAGES.index(named) > STAGES.index(after) ? named : after
   end
 
   # Adds the step (unless the application is already at that stage) and closes the suggestion.
