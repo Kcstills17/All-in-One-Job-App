@@ -2,6 +2,7 @@
 // likely job emails, and sends them to your Job Tracker, which sorts them into suggestions for you to
 // review. The tracker keeps only the sender, subject and the deciding sentence, never the email itself.
 //
+// Install it in the Google account where your job emails arrive; it can differ from your tracker login.
 // Setup: set APP_URL and TOKEN below (the token comes from the tracker's Account page), save, then run
 // `setup` once and allow access when Google asks. To stop: Disconnect on the Account page, or delete
 // this project.
@@ -32,7 +33,8 @@ function sync() {
   const since = props.getProperty("since") || START;
   let start = Number(props.getProperty("cursor") || 0);
   const startedOn = new Date();
-  const me = Session.getActiveUser().getEmail().toLowerCase();
+  // You: this account plus every address it can send as (e.g. another Gmail you forward here).
+  const me = [Session.getActiveUser().getEmail(), ...GmailApp.getAliases()].map(a => a.toLowerCase());
   const deadline = Date.now() + 4.5 * 60 * 1000;
   const sinceDate = new Date(since.replace(/\//g, "-") + "T00:00:00");
   wake();
@@ -46,7 +48,8 @@ function sync() {
     }
     const emails = [];
     threads.forEach(t => t.getMessages().forEach(m => {
-      if (m.getDate() < sinceDate || m.getFrom().toLowerCase().includes(me)) return;
+      const from = m.getFrom().toLowerCase();
+      if (m.getDate() < sinceDate || me.some(a => from.includes(a))) return;
       emails.push({ id: m.getId(), from: m.getFrom(), subject: m.getSubject(), date: m.getDate().toISOString(),
                     body: m.getPlainBody().slice(0, BODY) });
     }));
@@ -63,7 +66,8 @@ function wake() {
 
 function send(emails) {
   const options = { method: "post", contentType: "application/json", muteHttpExceptions: true,
-                    headers: { Authorization: "Bearer " + TOKEN }, payload: JSON.stringify({ emails }) };
+                    headers: { Authorization: "Bearer " + TOKEN },
+                    payload: JSON.stringify({ emails, mailbox: Session.getActiveUser().getEmail() }) };
   for (let attempt = 1; attempt <= 3; attempt++) {
     const res = UrlFetchApp.fetch(APP_URL + "/gmail/ingest", options);
     if (res.getResponseCode() === 200) { console.log(res.getContentText()); return; }
