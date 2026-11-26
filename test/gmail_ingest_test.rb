@@ -106,3 +106,11 @@ class GmailIngestTest < Minitest::Test
     assert_equal 401, ingest([], token: token).first
   end
 end
+
+class GmailPlainTextTest < Minitest::Test
+  def test_html_in_the_plain_part_is_cleaned_up
+    html = %(<!DOCTYPE HTML><html><head><style>p{}</style></head><body><p>After careful consideration, we&#39;ve decided to move forward with other candidates.</p></body></html>)
+    assert_equal "After careful consideration, we've decided to move forward with other candidates.", GmailIngest.plain(html)
+    assert_equal "plain text stays", GmailIngest.plain("plain text stays")
+  end
+end

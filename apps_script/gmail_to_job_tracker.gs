@@ -9,10 +9,12 @@
 
 const APP_URL = "https://YOUR-APP.onrender.com"; // your tracker's address, no trailing slash
 const TOKEN = "PASTE-YOUR-TOKEN-HERE";           // from Account → Gmail → Connect Gmail
+const ONLY_TO = "";                              // optional: only read mail sent to this address, e.g. "you@gmail.com"
 const START = "2026/01/01";                      // the first scan goes back to here (before your first application)
 
 // Gmail search: likely job email, minus promotions, social and what you sent.
-const QUERY = '-category:promotions -category:social -in:sent ' +
+// With ONLY_TO, only mail addressed or delivered to that address counts (another Gmail forwarded here).
+const QUERY = (ONLY_TO ? `(to:${ONLY_TO} OR deliveredto:${ONLY_TO}) ` : "") + '-category:promotions -category:social -in:sent ' +
   '(subject:(application OR applying OR applied OR interview OR candidacy OR opportunity OR position OR role) ' +
   'OR "other candidates" OR "moving forward" OR "move forward" OR "next steps" OR "your application" OR "regret to inform")';
 const PAGE = 50;       // threads per search

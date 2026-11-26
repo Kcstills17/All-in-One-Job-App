@@ -1,5 +1,6 @@
 require "date"
 require "set"
+require "cgi"
 require_relative "models"
 require_relative "gmail_scan"
 
@@ -38,12 +39,18 @@ module GmailIngest
     counts
   end
 
+  # Some senders put HTML in the "plain text" part; drop the tags so the saved sentence is readable.
+  def self.plain(text)
+    return text unless text.match?(/<(!doctype|html|body|div|table|p|br)\b/i)
+    CGI.unescapeHTML(text.gsub(%r{<(style|script|head)[^>]*>.*?</\1>}mi, " ").gsub(/<[^>]+>/, " ")).gsub(/\s+/, " ").strip
+  end
+
   # "Acme Recruiting <jobs@acme.com>" -> name and address
   def self.parse(raw)
     from = raw["from"].to_s
     address = from[/<([^>]+)>/, 1] || from[/\S+@\S+/].to_s
     { from_name: from.sub(/<[^>]*>/, "").delete('"').strip.then { _1 == address ? "" : _1 },
-      from_address: address.strip, subject: raw["subject"].to_s[0, 500], text: raw["body"].to_s[0, MAX_TEXT],
+      from_address: address.strip, subject: raw["subject"].to_s[0, 500], text: plain(raw["body"].to_s[0, MAX_TEXT]),
       date: (Date.parse(raw["date"].to_s) rescue nil) }
   end
 end
