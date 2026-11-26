@@ -61,6 +61,40 @@ module Api
       end
     end
 
+    # Gmail suggestions waiting for review. Approving one adds a timeline step to one of this
+    # account's live applications, dated from the email; nothing changes without approval.
+    r.on "gmail" do
+      matches = EmailMatch.where(account_id: account_id, status: "pending")
+      mailbox = GmailToken[account_id]&.mailbox
+      r.get("matches") { matches.order(Sequel.desc(:email_on), Sequel.desc(:id)).all.map { _1.to_api(mailbox) } }
+      r.post "matches/approve-all" do
+        category = r.POST["category"].to_s
+        raise Invalid, "unknown category" unless %w[rejected moving_on].include?(category)
+        approved = 0
+        DB.transaction do
+          matches.where(category: category).exclude(application_id: nil).all.each do |m|
+            job = apps.first(id: m.application_id) or next
+            approve_match(m, job, nil)
+            approved += 1
+          end
+        end
+        { approved: approved }
+      end
+      r.on "matches", Integer do |id|
+        match = matches.first(id: id) or not_found(r)
+        r.post "dismiss" do
+          match.update(status: "dismissed")
+          { ok: true }
+        end
+        r.post "approve" do
+          job_id = r.POST["application_id"].to_s.empty? ? match.application_id : r.POST["application_id"].to_i
+          job = (job_id && apps.first(id: job_id)) or raise Invalid, "Pick the application this email is about"
+          DB.transaction { approve_match(match, job, r.POST["stage"]) }
+          { job: job.refresh.to_api }
+        end
+      end
+    end
+
     r.on "resumes" do
       resumes = Resume.where(account_id: account_id)
       r.is do
@@ -257,6 +291,32 @@ module Api
       out[:status] = params["status"]
     end
     out
+  end
+
+  # Rejected for rejections; for next steps, the stage after where the application is now.
+  # When the email names the step ("schedule a technical interview"), use it if it's further along.
+  NAMED_STAGES = { /final round|onsite|on-site/i => "Final Round", /work trial|paid trial/i => "Work Trial",
+                   /take[- ]home|coding (challenge|assessment)|online assessment/i => "Take-home",
+                   /technical interview|technical screen|pairing|live coding/i => "Technical Interview",
+                   /hiring manager/i => "Hiring Manager", /phone screen|recruiter (call|screen)|intro call/i => "Recruiter Screen" }.freeze
+
+  def suggested_stage(match, job)
+    return "Rejected" if match.category == "rejected"
+    named = NAMED_STAGES.find { |re, _| "#{match.subject} #{match.sentence}".match?(re) }&.last
+    # Furthest real progress: endings (Rejected, Ghosted, Withdrawn) don't count.
+    last = job.history.map(&:stage).reject { %w[Rejected Ghosted Withdrawn].include?(_1) }.max_by { STAGES.index(_1) }
+    after = [nil, "Saved", "Applied", "Followed Up"].include?(last) ? "Recruiter Screen" : STAGES[[STAGES.index(last) + 1, STAGES.index("Accepted")].min]
+    named && STAGES.index(named) > STAGES.index(after) ? named : after
+  end
+
+  # Adds the step (unless the application is already at that stage) and closes the suggestion.
+  def approve_match(match, job, stage)
+    stage = stage.to_s.empty? ? suggested_stage(match, job) : stage
+    raise Invalid, "unknown stage #{stage}" unless STAGES.include?(stage)
+    unless job.history.last&.stage == stage
+      job.add_event(stage: stage, on: match.email_on || Date.today, note: "From Gmail: #{match.sentence}")
+    end
+    match.update(status: "approved", application_id: job.id)
   end
 
   def resume_fields(params, required: false)

@@ -58,6 +58,14 @@
   #toast[hidden] { display:none; }
   #toast .link { all:unset; cursor:pointer; font-weight:600; color:inherit; text-decoration:underline; }
   #toast .link:focus-visible { outline:2px solid var(--accent); }
+  /* Inbox (Gmail suggestions) */
+  .inbox-group + .inbox-group { margin-top:18px; }
+  .inbox-list { list-style:none; margin:6px 0 0; padding:0; }
+  .inbox-list > li { display:grid; gap:6px; padding:12px 0; border-top:1px solid var(--line); font-size:14px; }
+  .inbox-head { color:var(--text2); } .inbox-head a { margin-left:6px; }
+  .inbox-actions { gap:8px; } .inbox-actions select { max-width:220px; }
+  .inPick { display:block; width:100%; max-width:520px; margin-top:4px; }
+  .inCands { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
   /* Interviews tab */
   .iv-layout { display:grid; grid-template-columns:minmax(240px, 320px) 1fr; gap:16px; align-items:start; }
   .iv-list { list-style:none; margin:4px 0 14px; padding:0; }
@@ -289,6 +297,6 @@
        the names stay for screen readers. */
     .sideTrash { display:none; } /* no room in the phone bar; the Trash links by each list cover it */
     #tabs .label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-    .side { padding:8px 12px; } #tabs button { padding:0 8px; }
+    .side { padding:8px 10px; gap:2px; } #tabs { gap:0; } #tabs button { padding:0 7px; } .side-foot { gap:0; }
   }
   .msg:empty { min-height:0; margin:0; }
