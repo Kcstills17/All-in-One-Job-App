@@ -139,7 +139,7 @@ class App < Roda
       r.halt([401, { "content-type" => "application/json" }, ['{"error":"Unknown token"}']]) unless account_id
       emails = r.POST["emails"]
       r.halt([422, { "content-type" => "application/json" }, ['{"error":"Send {\"emails\": [...]}"}']]) unless emails.is_a?(Array)
-      GmailIngest.run(account_id, emails)
+      GmailIngest.run(account_id, emails, mailbox: r.POST["mailbox"])
     rescue ArgumentError => e
       response.status = 422
       { error: e.message }
