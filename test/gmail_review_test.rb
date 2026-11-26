@@ -100,6 +100,22 @@ class GmailReviewTest < Minitest::Test
     assert_equal "Hiring Manager", res["job"]["history"].last["stage"]
   end
 
+  # Backfilling progress on a job that ended in a rejection: the step lands on the email's date,
+  # before the rejection, so the job still ends Rejected but shows how far it got.
+  def test_an_earlier_step_keeps_the_rejection_last
+    log_in("me@example.com")
+    job = job(@me, "Late", [])
+    job.add_event(stage: "Applied", on: Date.new(2026, 3, 1), note: "")
+    job.add_event(stage: "Rejected", on: Date.new(2026, 3, 20), note: "")
+    early = EmailMatch.create(account_id: @me, application_id: job.id, category: "moving_on", sentence: "Here's your take-home.",
+                              msg_key: "early", sender: "x", subject: "Take-home", email_on: Date.new(2026, 3, 10), candidates: "")
+    same_day = EmailMatch.create(account_id: @me, application_id: job.id, category: "moving_on", sentence: "Final round invite.",
+                                 msg_key: "same", sender: "x", subject: "Final round", email_on: Date.new(2026, 3, 20), candidates: "")
+    api("POST", "/api/gmail/matches/#{early.id}/approve", { stage: "Take-home" })
+    _, res = api("POST", "/api/gmail/matches/#{same_day.id}/approve", { stage: "Final Round" })
+    assert_equal %w[Applied Take-home Final\ Round Rejected], res["job"]["history"].map { _1["stage"] }
+  end
+
   def test_other_accounts_cannot_review_or_target_your_data
     log_in("other@example.com")
     assert_empty api("GET", "/api/gmail/matches")[1]
