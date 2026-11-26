@@ -112,6 +112,9 @@ end
 # Gmail scan. Only the token's digest is kept; the token itself is shown once.
 class GmailToken < Sequel::Model
   unrestrict_primary_key
+  plugin :column_encryption do |enc|
+    enc.column :mailbox, format: Encrypted::TEXT # the Gmail address the script reads
+  end
   def self.digest(token) = OpenSSL::Digest::SHA256.hexdigest(token.to_s)
 end
 
@@ -125,9 +128,14 @@ class EmailMatch < Sequel::Model
   include Encrypted
   many_to_one :application
 
-  def gmail_url = "https://mail.google.com/mail/u/0/#all/#{msg_key}"
-  def to_api
-    { id: id.to_s, category:, status:, email_on: email_on.to_s, sender:, subject:, sentence:, gmail_url:,
+  # With the mailbox, Gmail opens that account even if the browser is signed in to several.
+  def gmail_url(mailbox = nil)
+    who = mailbox.to_s.match?(%r{\A[^\s/#@]+@[^\s/#@]+\z}) ? mailbox : 0
+    "https://mail.google.com/mail/u/#{who}/#all/#{msg_key}"
+  end
+
+  def to_api(mailbox = nil)
+    { id: id.to_s, category:, status:, email_on: email_on.to_s, sender:, subject:, sentence:, gmail_url: gmail_url(mailbox),
       application_id: application_id&.to_s, candidates: candidates.to_s.split(",") }
   end
 end

@@ -10,7 +10,7 @@ module GmailIngest
   MAX_TEXT = 20_000     # characters of body read per email
 
   # emails: [{ "id", "from", "subject", "date", "body" }]. Returns counts for the script's log.
-  def self.run(account_id, emails)
+  def self.run(account_id, emails, mailbox: nil)
     raise ArgumentError, "send at most #{MAX_EMAILS} emails at a time" if emails.size > MAX_EMAILS
     apps = Application.where(account_id: account_id, deleted_at: nil).eager(:events).all
                       .reject { _1.history.last&.stage == "Saved" }
@@ -31,7 +31,10 @@ module GmailIngest
                         candidates: Array(match[:candidates]).map { _1[:id] }.join(","))
       counts[match[:app] ? :matched : :needs_a_match] += 1
     end
-    GmailToken.where(account_id: account_id).update(last_used_at: Time.now)
+    token = GmailToken[account_id]
+    token.set(last_used_at: Time.now)
+    token.set(mailbox: mailbox.to_s[0, 320]) if mailbox.to_s.include?("@")
+    token.save
     counts
   end
 
