@@ -21,12 +21,42 @@ function suggestedStage(m, job) {
 }
 
 const jobLabel = j => `${j.company || "(no company)"} · ${j.title || "—"}${j.applied_on ? ` · ${j.applied_on}` : ""}`;
+const words = s => String(s || "").toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3);
+// Words that say nothing about which company an email is from.
+const NOISE = new Set(["the", "and", "for", "you", "your", "our", "with", "from", "thank", "thanks", "applying", "application",
+  "applications", "update", "hiring", "team", "recruiting", "recruiter", "talent", "careers", "career", "jobs", "job", "noreply",
+  "reply", "mail", "email", "com", "info", "interest", "regarding", "about", "important", "information", "position", "role",
+  "opportunity", "next", "steps", "status", "inc", "llc", "group", "acquisition", "people", "workday", "greenhouse", "lever",
+  "ashbyhq", "ashby", "rippling", "icims", "indeed", "linkedin", "gmail", "support"]);
+
+// Likely applications for an unmatched email: the server's candidates, else applications whose company
+// shares a word with the sender's name, address or subject; most recent first.
+function likelyJobs(m) {
+  const fromServer = m.candidates.map(id => jobs.find(j => j.id === id)).filter(Boolean);
+  if (fromServer.length) return fromServer;
+  const hints = new Set(words(`${m.sender} ${m.subject}`).filter(w => !NOISE.has(w)));
+  return jobs.filter(j => !appliedAfter(j, m)).map(j => [j, words(j.company).filter(w => hints.has(w)).length])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1] || (b[0].applied_on || "").localeCompare(a[0].applied_on || ""))
+    .slice(0, 6).map(([j]) => j);
+}
+
+// An email can't be about an application sent after it.
+const appliedAfter = (j, m) => j.applied_on && m.email_on && j.applied_on > m.email_on;
+
+// Search box results: every word typed must appear in the company, role or date.
+function searchJobs(q) {
+  const ws = words(q);
+  if (!ws.length) return [];
+  return jobs.filter(j => { const hay = `${j.company} ${j.title} ${j.applied_on}`.toLowerCase(); return ws.every(w => hay.includes(w)); })
+    .sort((a, b) => (b.applied_on || "").localeCompare(a.applied_on || "")).slice(0, 8);
+}
+const pickButtons = list => list.map(c => `<button type="button" class="ghost inCand" data-id="${c.id}">${esc(jobLabel(c))}</button>`).join("");
 
 function renderInbox() {
   const list = Array.isArray(gmailMatches) ? gmailMatches : [];
   const groups = [["rejected", "Rejections"], ["moving_on", "Moving on"]];
   $("#inboxEmpty").hidden = list.length > 0;
-  if (!$("#inboxJobs").options.length) $("#inboxJobs").innerHTML = jobs.map(j => `<option value="${esc(jobLabel(j))}">`).join("");
   $("#inboxGroups").innerHTML = groups.map(([cat, label]) => {
     const items = list.filter(m => m.category === cat);
     if (!items.length) return "";
@@ -39,12 +69,13 @@ function renderInbox() {
 
 function inboxItem(m) {
   const job = jobs.find(j => j.id === m.application_id);
-  const candidates = m.candidates.map(id => jobs.find(j => j.id === id)).filter(Boolean);
+  const likely = job ? [] : likelyJobs(m);
   const target = job
     ? `<span class="sub" style="margin:0">→ <span class="link" data-open="${job.id}">${esc(jobLabel(job))}</span> · now ${esc(stageOf(job))}</span>`
-    : `<label class="sub" style="margin:0">Which application?
-        <input list="inboxJobs" class="inPick" placeholder="${candidates.length ? "Pick one of the likely ones or search" : "Search your applications"}" aria-label="Application for this email">
-        ${candidates.length ? `<span class="inCands">${candidates.map(c => `<button type="button" class="ghost inCand" data-id="${c.id}">${esc(jobLabel(c))}</button>`).join("")}</span>` : ""}</label>`;
+    : `<div class="inPicker"><span class="sub" style="margin:0">Which application? <span class="inChosen"></span></span>
+        ${likely.length ? `<span class="inCands"><span class="sub" style="margin:0">Likely:</span>${pickButtons(likely)}</span>` : ""}
+        <input type="search" class="inPick" placeholder="Search by company, role or date" aria-label="Search your applications for this email" autocomplete="off">
+        <span class="inCands inResults"></span></div>`;
   return `<li data-id="${m.id}" data-job="${job?.id || ""}">
     <div class="inbox-head"><b>${esc(m.email_on || "")}</b> · ${esc(m.sender)} <a href="${esc(m.gmail_url)}" target="_blank" rel="noopener">Open in Gmail ↗</a></div>
     <div><b>${esc(m.subject)}</b></div>
@@ -80,18 +111,28 @@ $("#view-inbox").addEventListener("click", async e => {
     return;
   }
   if (!li) return;
-  if (e.target.matches(".inCand")) { li.dataset.job = e.target.dataset.id; li.querySelector(".inPick").value = e.target.textContent;
-    li.querySelector(".inStage").value = suggestedStage(gmailMatches.find(m => m.id === li.dataset.id), jobs.find(j => j.id === e.target.dataset.id)); }
+  if (e.target.matches(".inCand")) choose(li, e.target.dataset.id);
   if (e.target.matches(".inApprove")) {
     if (!li.dataset.job) return alert("Pick the application this email is about first.");
     inboxAct(li, "approve");
   }
   if (e.target.matches(".inDismiss")) inboxAct(li, "dismiss");
 });
-// Typing in the search box: a full match from the list picks that application.
+// Picking an application: remember it, show it, and suggest the stage for that application.
+function choose(li, jobId) {
+  const job = jobs.find(j => j.id === jobId);
+  li.dataset.job = jobId;
+  li.querySelectorAll(".inCand").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === jobId)));
+  const m = gmailMatches.find(x => x.id === li.dataset.id);
+  li.querySelector(".inChosen").innerHTML = `→ <b>${esc(jobLabel(job))}</b> · now ${esc(stageOf(job))}` +
+    (appliedAfter(job, m) ? ` <span class="inWarn">applied after this email (${esc(m.email_on)}), so it's probably a different one</span>` : "");
+  li.querySelector(".inStage").value = suggestedStage(gmailMatches.find(m => m.id === li.dataset.id), job);
+}
+// Typing in the search box lists matching applications as buttons right under it.
 $("#view-inbox").addEventListener("input", e => {
   if (!e.target.matches(".inPick")) return;
-  const li = e.target.closest("li"), job = jobs.find(j => jobLabel(j) === e.target.value);
-  li.dataset.job = job?.id || "";
-  if (job) li.querySelector(".inStage").value = suggestedStage(gmailMatches.find(m => m.id === li.dataset.id), job);
+  const li = e.target.closest("li"), found = searchJobs(e.target.value);
+  li.querySelector(".inResults").innerHTML = e.target.value.trim()
+    ? (found.length ? pickButtons(found) : `<span class="sub" style="margin:0">No applications match.</span>`) : "";
+  if (li.dataset.job) li.querySelectorAll(".inResults .inCand").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === li.dataset.job)));
 });

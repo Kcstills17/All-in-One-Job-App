@@ -64,8 +64,12 @@
   .inbox-list > li { display:grid; gap:6px; padding:12px 0; border-top:1px solid var(--line); font-size:14px; }
   .inbox-head { color:var(--text2); } .inbox-head a { margin-left:6px; }
   .inbox-actions { gap:8px; } .inbox-actions select { max-width:220px; }
-  .inPick { display:block; width:100%; max-width:520px; margin-top:4px; }
-  .inCands { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .inPicker { display:grid; gap:6px; }
+  .inPick { display:block; width:100%; max-width:520px; }
+  .inCands { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .inCands:empty { display:none; }
+  .inWarn { color:var(--warn); font-weight:600; }
+  .inCand[aria-pressed="true"] { background:var(--accent-weak); color:var(--accent); border-color:var(--accent); }
   /* Interviews tab */
   .iv-layout { display:grid; grid-template-columns:minmax(240px, 320px) 1fr; gap:16px; align-items:start; }
   .iv-list { list-style:none; margin:4px 0 14px; padding:0; }
