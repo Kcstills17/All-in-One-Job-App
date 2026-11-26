@@ -17,6 +17,7 @@ const START = "2026/01/01";                      // the first scan goes back to 
 const QUERY = (ONLY_TO ? `(to:${ONLY_TO} OR deliveredto:${ONLY_TO}) ` : "") + '-category:promotions -category:social -in:sent ' +
   '(subject:(application OR applying OR applied OR interview OR candidacy OR opportunity OR position OR role) ' +
   'OR "other candidates" OR "moving forward" OR "move forward" OR "next steps" OR "your application" OR "regret to inform")';
+const BASE = APP_URL.trim().replace(/\/+$/, ""); // a trailing slash would make "//gmail/ingest", which the tracker refuses
 const PAGE = 50;       // threads per search
 const BATCH = 100;     // emails per request (the tracker's limit)
 const BODY = 20000;    // characters of each email's text to send
@@ -78,20 +79,32 @@ function mailbox() {
   return Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || "";
 }
 
-// The tracker's free plan sleeps when idle; one request wakes it before the real ones.
+// The tracker's free plan sleeps when idle and takes up to a minute or two to start. Keep asking
+// until it answers, so the first batch doesn't land mid-startup.
 function wake() {
-  try { UrlFetchApp.fetch(APP_URL + "/login", { muteHttpExceptions: true }); } catch (e) { Utilities.sleep(20000); }
+  for (let i = 0; i < 12; i++) {
+    try {
+      if (UrlFetchApp.fetch(BASE + "/login", { muteHttpExceptions: true }).getResponseCode() === 200) return;
+    } catch (e) { /* timed out while it starts */ }
+    console.log("Waiting for the tracker to wake up…");
+    Utilities.sleep(15000);
+  }
+  throw new Error("The tracker didn't wake up within 3 minutes; the next hourly run will try again.");
 }
 
 function send(emails) {
   const options = { method: "post", contentType: "application/json", muteHttpExceptions: true,
-                    headers: { Authorization: "Bearer " + TOKEN },
+                    headers: { Authorization: "Bearer " + TOKEN }, followRedirects: false,
                     payload: JSON.stringify({ emails, mailbox: mailbox() }) };
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const res = UrlFetchApp.fetch(APP_URL + "/gmail/ingest", options);
-    if (res.getResponseCode() === 200) { console.log(res.getContentText()); return; }
-    if (res.getResponseCode() === 401) throw new Error("The tracker doesn't know this token. Make a new one on the Account page and paste it into TOKEN.");
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const res = UrlFetchApp.fetch(BASE + "/gmail/ingest", options);
+    const code = res.getResponseCode();
+    if (code === 200) { console.log(res.getContentText()); return; }
+    if (code === 401) throw new Error("The tracker doesn't know this token. Make a new one on the Account page and paste it into TOKEN.");
+    if (code === 403 || code === 404) throw new Error(`The tracker answered ${code}: check APP_URL is your tracker's address, e.g. https://your-app.onrender.com`);
+    console.log(`The tracker answered ${code}: ${res.getContentText().slice(0, 200)}; trying again (${attempt} of 5).`);
+    if (code >= 500) wake(); // it may have restarted
     Utilities.sleep(15000 * attempt);
   }
-  throw new Error("The tracker didn't accept the emails after 3 tries; the next hourly run will try again.");
+  throw new Error("The tracker didn't accept the emails after 5 tries; the next hourly run will try again.");
 }
